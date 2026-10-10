@@ -40,9 +40,7 @@ include(
     ":relay:Network:codec-rcon",
     ":relay:Network:transport-raknet",
 )
-// relay:Protocol:bedrock-codec / bedrock-connection / common are no longer built from the local
-// vendored source (see relay/build.gradle.kts) - they're pulled from Maven instead so we get
-// current Bedrock protocol support. Leaving the source directories in place, just not building them.
-// relay:Protocol:adventure was also removed from this list: it pointed at a nonexistent
-// "relay/adventure" directory (the real path is "relay/Protocol/adventure") and nothing in the
-// project actually depended on it as a project(...), so it was dead/broken either way.
+// relay/Protocol/{adventure,bedrock-codec,bedrock-connection,common} is kept in the tree as the
+// vendored/newest Bedrock Protocol source, but is NOT built - :relay pulls the Bedrock
+// protocol/codecs (and netty-transport-raknet) from Maven instead
+// (org.cloudburstmc.protocol:*:3.0.0.Beta13-SNAPSHOT). See relay/build.gradle.kts.

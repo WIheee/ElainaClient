@@ -29,7 +29,6 @@ class OnlineLoginPacketListener(
     override fun beforeClientBound(packet: BedrockPacket): Boolean {
         if (packet is LoginPacket) {
             println("Processing login packet")
-            println("Client LoginPacket: protocol=${packet.protocolVersion} clientJwtLength=${packet.clientJwt?.length}")
 
             try {
                 // BedrockAuthManager refreshes its own tokens on demand - calling getUpToDate()
@@ -86,11 +85,6 @@ class OnlineLoginPacketListener(
                 loginPacket.protocolVersion = negotiatedProtocol
                 loginPacket.authPayload = CertificateChainPayload(chain, AuthType.FULL)
                 loginPacket.clientJwt = skinData
-                println(
-                    "Sending upstream LoginPacket: negotiatedProtocol=$negotiatedProtocol " +
-                        "chainEntries=${chain.size} clientJwtLength=${skinData.length} " +
-                        "target=${wRelaySession.wRelay.remoteAddress?.hostName}"
-                )
                 wRelaySession.serverBoundImmediately(loginPacket)
 
                 println("Login packet sent successfully")
@@ -105,7 +99,6 @@ class OnlineLoginPacketListener(
         }
         if (packet is ServerToClientHandshakePacket) {
             try {
-                println("Received ServerToClientHandshakePacket (server accepted login chain, negotiating encryption)")
                 val parts = packet.jwt.split(".")
                 if (parts.size != 3) {
                     throw Exception("Invalid JWT format")

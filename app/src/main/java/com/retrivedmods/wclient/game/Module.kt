@@ -24,8 +24,15 @@ abstract class Module(
     var isEnabled: Boolean
         get() = _isEnabled
         set(value) {
+            if (_isEnabled == value) return
             _isEnabled = value
-            if (value) onEnabled() else onDisabled()
+            // onEnabled/onDisabled read `session` (subclasses touch session.localPlayer etc.), so they
+            // must not run before a GameSession has been attached - e.g. while restoring config at
+            // startup (Module.fromJson -> setEnabled) or stopping the service, where no session exists
+            // yet. Firing here would throw UninitializedPropertyAccessException from those overrides.
+            if (isSessionCreated) {
+                if (value) onEnabled() else onDisabled()
+            }
         }
 
     val isSessionCreated: Boolean

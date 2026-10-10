@@ -204,8 +204,6 @@ class WRelaySession internal constructor(
     inner class ClientSession(peer: BedrockPeer, subClientId: Int) :
         BedrockClientSession(peer, subClientId) {
 
-        private var loggedPackets = 0
-
         init {
             packetHandler = object : BedrockPacketHandler {
 
@@ -227,16 +225,11 @@ class WRelaySession internal constructor(
 
         override fun onPacket(wrapper: BedrockPacketWrapper) {
             try {
-                // Temporary diagnostic: surface what the upstream server actually sends, so a login
-                // rejection (a DisconnectPacket) isn't silently forwarded to the client and lost.
-                // Disconnects always log their reason; the first ~60 packets are named, then it goes
-                // quiet so world-load traffic doesn't flood the log. Remove once login is working.
+                // Surface a server-sent DisconnectPacket with its reason instead of forwarding it
+                // silently, so "server rejected us" is visible in the log next time.
                 val incoming = wrapper.packet
                 if (incoming is DisconnectPacket) {
-                    println("Upstream DisconnectPacket: reason=${incoming.reason} kickMessage=${incoming.kickMessage} filteredMessage=${incoming.filteredMessage}")
-                } else if (loggedPackets < 60) {
-                    loggedPackets++
-                    println("Upstream packet #$loggedPackets: ${incoming.javaClass.simpleName}")
+                    println("Upstream DisconnectPacket: reason=${incoming.reason} kickMessage=${incoming.kickMessage}")
                 }
 
                 listeners.forEach { listener ->

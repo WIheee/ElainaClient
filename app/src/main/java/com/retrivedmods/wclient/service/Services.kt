@@ -173,8 +173,15 @@ object Services {
 
             wRelay?.let { relay ->
                 try {
-                    relay.wRelaySession?.client?.disconnect()
-                    relay.wRelaySession?.server?.disconnect()
+                    // Guard each disconnect: the client/server session may already be closed (e.g.
+                    // the game client dropped on its own), and disconnecting a closed session throws
+                    // IllegalStateException("Session has been closed").
+                    if (relay.wRelaySession?.client?.isConnected == true) {
+                        relay.wRelaySession?.client?.disconnect()
+                    }
+                    if (relay.wRelaySession?.server?.isConnected == true) {
+                        relay.wRelaySession?.server?.disconnect()
+                    }
 
                     if (relay.javaClass.methods.any { it.name == "stop" }) {
                         relay.javaClass.getMethod("stop").invoke(relay)

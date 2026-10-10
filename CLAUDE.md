@@ -20,12 +20,11 @@ treat module *behavior* as given, don't extend it speculatively.
 - `:relay` — plain Kotlin/JVM library (`com.retrivedmods.wrelay`). The proxy engine: RakNet server,
   upstream client, codec negotiation, packet listeners, auth handshake. **No Android SDK dependency** —
   it can't use `android.util.Log`; it logs via `println` (visible in logcat for the app process).
-- `relay/Network/*` (codec-query, codec-rcon, transport-raknet) and `relay/Protocol/*` are vendored
-  upstream source left in the tree. Some are still listed in `settings.gradle.kts`, but **nothing in
-  the app's dependency graph depends on them** — `relay/build.gradle.kts` has no `project(...)` deps and
-  pulls Bedrock protocol/codecs from Maven instead (`org.cloudburstmc.protocol:bedrock-codec/connection/common`
-  `3.0.0.Beta13-SNAPSHOT` from opencollab's repos; `Protocol:bedrock-*/common` are explicitly excluded).
-  Don't "fix" the vendored copies.
+- `relay/Network/*` (codec-query, codec-rcon, transport-raknet) — vendored, listed in
+  `settings.gradle.kts`, but **nothing depends on them**. `relay/Protocol/*` — the vendored (newest)
+  CloudburstMC Protocol **source**, kept in the tree as reference, **not built**.
+  `:relay` compiles against **Maven** instead (`org.cloudburstmc.protocol:bedrock-codec/connection/common`
+  `3.0.0.Beta13-SNAPSHOT` from opencollab's repos). Don't "fix" the vendored copies. See `PROTOCOL_NOTES.md`.
 
 ## Build / run / test
 
@@ -82,8 +81,11 @@ Listeners (`WRelayPacketListener`, in `relay/.../listener/`) are added in order 
 
 `CodecRegistry` (`relay/.../codec/CodecRegistry.kt`) registers codecs by **reflecting** on
 `org.cloudburstmc.protocol.bedrock.codec.v{N}.Bedrock_v{N}.CODEC`. A wrong/missing class name is a
-non-fatal no-op (logged). To advertise a newer Bedrock protocol, you generally just add a
-`registerCodec(protocol, version, className)` line, provided the Maven codec artifact ships that class.
+non-fatal no-op (logged) — `getClosestCodec()` then falls back to the nearest lower version.
+**Only protocol 924…2225 (Minecraft 1.26.x) is registered** (`VersionDetector` mirrors this). The
+codec classes form a long inheritance chain (`v924 extends v898`, `v975 extends v944`, …), so the
+*source* can't be pruned by version — only the *registration*. To advertise a newer protocol (or to
+build the protocol from the vendored source), follow `PROTOCOL_NOTES.md`.
 
 `Definitions` (`relay/.../definition/`) loads a bundled `nbt/block_palette.nbt` into hashed/non-hashed
 block definition registries plus an item registry. `ConnectionManager` handles upstream connect with
@@ -164,8 +166,19 @@ in `SharedPreferences("game_settings")`.
   (which is usually a partial custom-block list, not the full palette); the live palette is last-resort.
 - Diagnostic chat messages from inside `StartGamePacket` handling are queued and flushed on the first
   `PlayerAuthInputPacket`, because injected `TextPacket`s don't display before the session is spawned.
-- `relay/build.gradle.kts` pins cloudburst `3.0.0.Beta13-SNAPSHOT`; the older vendored `relay/Protocol/*`
-  sources left in the tree are effectively dead code (not on the app's classpath).
+- `relay/build.gradle.kts` pins cloudburst `3.0.0.Beta13-SNAPSHOT`; the vendored `relay/Protocol/*`
+  sources are not on the app's classpath (reference only — see `PROTOCOL_NOTES.md`).
+- `WRelaySession`'s `client` setter runs during the upstream peer's **`channelActive`** (BedrockPeer
+  eagerly creates session 0 there), i.e. possibly after the downstream game client has gone. Never
+  read `server.codec` / `server.peer.codecHelper` on that path (it NPEs once downstream closes) — use
+  the codec captured at negotiation (`onCodecNegotiated` / `negotiatedProtocolVersion()`).
+- `Module.isEnabled`'s setter only fires `onEnabled`/`onDisabled` when `isSessionCreated`: config
+  restore (`Module.fromJson`) runs before any `GameSession` exists, and those callbacks read `session`.
+- This repo lives on a **FUSE mount** (`/storage/emulated/0`): `cp -a` **and** `cp -r` can produce files
+  whose `stat` size reads 0 while the content is intact. Copy source trees file-by-file and verify with
+  `find <dir> -type f -size 0`.
+- Companion docs: `PROTOCOL_NOTES.md` (protocol pitfalls + how to upgrade the protocol library),
+  `PLACEMENT_FIX_NOTES.md` (item-placement modules).
 - Placement modules (PistonCrystal/Surround/Scaffold) don't hand-build `ItemUse` transactions: they
   cache a real outgoing `ITEM_USE` placement from the player and clone it, sanitize the held `ItemData`
   net-id, rebuild server-authoritative inventory actions, and update local block state immediately.

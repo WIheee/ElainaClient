@@ -1,0 +1,552 @@
+package com.elainaclient.game.world
+
+import com.elainaclient.game.GameSession
+import com.elainaclient.game.entity.Entity
+import com.elainaclient.game.entity.EntityUnknown
+import com.elainaclient.game.entity.Item
+import com.elainaclient.game.entity.Player
+import com.elainaclient.game.registry.BlockDefinition
+import com.elainaclient.game.registry.UnknownBlockDefinition
+import com.elainaclient.game.world.chunk.Chunk
+import org.cloudburstmc.protocol.bedrock.packet.AddEntityPacket
+import org.cloudburstmc.protocol.bedrock.packet.AddItemEntityPacket
+import org.cloudburstmc.protocol.bedrock.packet.AddPlayerPacket
+import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket
+import org.cloudburstmc.protocol.bedrock.packet.ChangeDimensionPacket
+import org.cloudburstmc.protocol.bedrock.packet.ChunkRadiusUpdatedPacket
+import org.cloudburstmc.protocol.bedrock.packet.ClientCacheBlobStatusPacket
+import org.cloudburstmc.protocol.bedrock.packet.ClientCacheMissResponsePacket
+import org.cloudburstmc.protocol.bedrock.packet.LevelChunkPacket
+import org.cloudburstmc.protocol.bedrock.packet.PlayerListPacket
+import org.cloudburstmc.protocol.bedrock.packet.RemoveEntityPacket
+import org.cloudburstmc.protocol.bedrock.packet.StartGamePacket
+import org.cloudburstmc.protocol.bedrock.packet.SubChunkPacket
+import org.cloudburstmc.protocol.bedrock.packet.TakeItemEntityPacket
+import org.cloudburstmc.protocol.bedrock.packet.UpdateBlockPacket
+import org.cloudburstmc.protocol.bedrock.packet.UpdateSubChunkBlocksPacket
+import org.cloudburstmc.math.vector.Vector3f
+import org.cloudburstmc.math.vector.Vector3i
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.pow
+
+@Suppress("MemberVisibilityCanBePrivate")
+class Level(val session: GameSession) {
+
+    val entityMap = ConcurrentHashMap<Long, Entity>()
+
+    val playerMap = ConcurrentHashMap<UUID, PlayerListPacket.Entry>()
+
+    // --- world/chunk block tracking -----------------------------------------------------------
+    // Ported (with real changes, see Chunk/ChunkSection/BlockStorage) from ProtoHax. Handles the
+    // "normal" full LevelChunkPacket path, the newer per-subchunk request system (SubChunkPacket),
+    // and blob-cache chunk loading (via ClientCacheMissResponsePacket, see pendingCacheBlobs
+    // below) - so real block data is tracked regardless of which of the three loading methods a
+    // given server uses. UpdateBlockPacket (single block changes) and UpdateSubChunkBlocksPacket
+    // (batch changes - explosions, redstone, etc.) are both handled, so blocks placed/broken
+    // after a chunk loads stay accurate.
+
+    val chunks = ConcurrentHashMap<Long, Chunk>()
+
+    /**
+     * Blob-cache loading (LevelChunkPacket.isCachingEnabled) doesn't put block data directly in
+     * the LevelChunkPacket - instead it lists content-hash IDs (one per subchunk, plus one for
+     * biome data, in bottom-to-top order) and the real client separately negotiates with the
+     * server over which hashes it already has cached (ClientCacheBlobStatusPacket) vs needs sent
+     * (ClientCacheMissResponsePacket, hash -> raw payload). As a relay we don't need to run that
+     * negotiation ourselves - the real client does it - we just need to passively watch
+     * ClientCacheMissResponsePacket go by and match each hash back to the (chunk, section) it
+     * belongs to, which we recorded here when the LevelChunkPacket first listed it. A hash that
+     * was already in the real client's own cache never triggers a miss response and so never
+     * arrives at all - that subchunk just silently stays untracked (same as any other subchunk we
+     * haven't seen data for yet), which is a value-if-known / not-an-error position, matching
+     * every other gap in this tracking (unloaded chunks, servers that don't use this feature).
+     */
+    private val pendingCacheBlobs = ConcurrentHashMap<Long, Pair<Long, Int>>() // blobId -> (chunkHash, sectionIndex); sectionIndex == -1 means "biome blob, ignore"
+    private var levelChunkDiagCount = 0
+    private var levelChunkParseCheckCount = 0
+    private var subChunkDiagCount = 0
+
+    var is384WorldSupported = false
+    private var versionSupports384World = false
+    private var lastSeenVanillaVersion = ""
+        private set
+
+    var viewDistance = -1
+        private set
+
+    fun onDisconnect() {
+        entityMap.clear()
+        playerMap.clear()
+        chunks.clear()
+        pendingCacheBlobs.clear()
+    }
+
+    fun onPacketBound(packet: BedrockPacket) {
+        when (packet) {
+            is StartGamePacket -> {
+                entityMap.clear()
+                playerMap.clear()
+                chunks.clear()
+
+                versionSupports384World = try {
+                    // 384 height world was introduced in Minecraft 1.18
+                    val version = packet.vanillaVersion
+                    if (version.isBlank()) {
+                        // Some servers send an empty vanillaVersion string. "".split(".") returns
+                        // [""] (no exception), which then fails the parts.size >= 2 check below and
+                        // silently resolved to false - meaning every overworld chunk got read with
+                        // the wrong (pre-1.18, no -64 Y offset) section layout on any such server,
+                        // even though the actual world was almost certainly modern. Treat unknown
+                        // the same as "assume current/384-capable", matching how unknown block
+                        // state elsewhere in this file defaults to permissive rather than blocking.
+                        true
+                    } else {
+                        val parts = version.split(".")
+                        parts.size >= 2 && parts[0] == "1" && (parts[1].toIntOrNull() ?: 0) >= 18
+                    }
+                } catch (e: Exception) {
+                    true
+                }
+                lastSeenVanillaVersion = packet.vanillaVersion
+                // See the ChangeDimensionPacket comment below for why this needs the current
+                // dimension too, not just the game version. StartGamePacket usually carries the
+                // player's spawn dimension itself (e.g. spawning directly into the Nether via a
+                // portal-linked join) - check for it here so that case is handled correctly too,
+                // not just later dimension switches. Falls back to assuming Overworld (0) if this
+                // particular property name isn't found (see readIntPropertyViaReflection's doc).
+                // NOTE: originally also tried reading a dimension id off StartGamePacket via
+                // reflection here to double check the "we start in the Overworld" assumption -
+                // reverted that. It came back is384WorldSupported=false for a player confirmed to
+                // be in the Overworld, meaning one of the guessed method names matched something
+                // real but unrelated (not an actual dimension id) and threw this off. Simpler and
+                // now confirmed-correct: assume Overworld at connect time (true in the vast
+                // majority of cases - a join mid-Nether would need a ChangeDimensionPacket to have
+                // gotten there anyway, which the case below already corrects for).
+                is384WorldSupported = versionSupports384World
+            }
+
+            is LevelChunkPacket -> {
+                if (!session.isBlockMappingInitialized) {
+                    // shouldn't normally happen (StartGamePacket sets blockMapping before Level
+                    // sees it), but guard anyway since a missing mapping would crash chunk parsing
+                    return
+                }
+
+                if (levelChunkDiagCount < 5) {
+                    levelChunkDiagCount++
+                    session.displayClientMessage(
+                        "§a[ChunkDiag] #$levelChunkDiagCount LevelChunkPacket (${packet.chunkX},${packet.chunkZ}) " +
+                            "isCachingEnabled=${packet.isCachingEnabled} isRequestSubChunks=${packet.isRequestSubChunks} " +
+                            "subChunksLength=${packet.subChunksLength} data.readableBytes=${packet.data.readableBytes()} " +
+                            "is384WorldSupported=$is384WorldSupported vanillaVersion='$lastSeenVanillaVersion'"
+                    )
+                }
+
+                val chunk = Chunk(packet.chunkX, packet.chunkZ, is384WorldSupported, session.blockMapping)
+                try {
+                    if (packet.isCachingEnabled) {
+                        // No raw data here - record which (chunk, section) each listed hash is
+                        // for, then wait for ClientCacheMissResponsePacket (below) to supply the
+                        // actual bytes for whichever ones the real client didn't already have
+                        // cached. Per protocol, blobIds is subChunksLength subchunk hashes
+                        // (bottom-to-top) followed by exactly one biome-data hash - we only care
+                        // about the former.
+                        packet.blobIds.forEachIndexed { index, blobId ->
+                            val sectionIndex = if (index < packet.subChunksLength) index else -1
+                            pendingCacheBlobs[blobId] = chunk.hash to sectionIndex
+                        }
+                    } else if (!packet.isRequestSubChunks) {
+                        // duplicate() gives us an independent reader index over the same underlying
+                        // memory (refcount shared with the original packet), so parsing here can
+                        // never disturb packet.data's own reader index / the relay's forwarding of
+                        // the real packet to the client.
+                        val buf = packet.data.duplicate()
+                        chunk.read(buf, packet.subChunksLength)
+                    }
+                    // Either way, register the (possibly still-empty) chunk now: both
+                    // isCachingEnabled and isRequestSubChunks mean the actual block data streams
+                    // in afterwards (via ClientCacheMissResponsePacket or SubChunkPacket
+                    // respectively), which needs a Chunk already sitting in the map to attach its
+                    // sections to.
+                    chunks[chunk.hash] = chunk
+
+                    // Only fires for chunks actually near the player right now (not just "the
+                    // first 5 chunks ever seen", which was almost always the spawn/lobby area and
+                    // told us nothing about wherever the player later teleports to test Surround/
+                    // PistonCrystal - those can be tens of thousands of chunks away from spawn on
+                    // some servers). Samples at the player's real current Y, not a hardcoded 64,
+                    // since a fixed height can fall outside subChunksLength for short/limited
+                    // worlds and just show an unpopulated section's default air value instead of
+                    // real terrain.
+                    val playerPos = session.localPlayer.vec3Position
+                    val playerChunkX = kotlin.math.floor(playerPos.x).toInt() shr 4
+                    val playerChunkZ = kotlin.math.floor(playerPos.z).toInt() shr 4
+                    val nearPlayer = kotlin.math.abs(packet.chunkX - playerChunkX) <= 2 &&
+                        kotlin.math.abs(packet.chunkZ - playerChunkZ) <= 2
+                    if ((levelChunkParseCheckCount < 5 || nearPlayer) && !packet.isCachingEnabled && !packet.isRequestSubChunks) {
+                        levelChunkParseCheckCount++
+                        // Sample a handful of local positions right after a successful parse, to
+                        // tell apart "chunk.read() silently produced empty/garbage data" from
+                        // "parsing is fine but something downstream (getBlockAt, blockMapping
+                        // lookup) doesn't line up with it". Also prints whether each sampled
+                        // section was ever actually touched by chunk.read() (populated=false means
+                        // the sample fell outside subChunksLength and is reading the section's
+                        // untouched default - always session.blockMapping.airId, never real block
+                        // data - which is a completely different problem from a populated section
+                        // returning a rawId with no matching palette entry).
+                        val sampleY = kotlin.math.floor(playerPos.y).toInt()
+                        val sectionIndex = (if (is384WorldSupported) sampleY + 64 else sampleY) shr 4
+                        val populated = chunk.sectionStorage.getOrNull(sectionIndex)?.populated
+                        val samples = (0..15 step 4).joinToString(" | ") { x ->
+                            val rawId = chunk.getBlockAt(x, sampleY, 0)
+                            val def = session.blockMapping.getDefinition(rawId)
+                            "x=$x:rawId=$rawId,def=${def.identifier}"
+                        }
+                        session.displayClientMessage(
+                            "§d[ChunkParseCheck]${if (nearPlayer) "[NEAR-PLAYER]" else ""} chunk(${packet.chunkX},${packet.chunkZ}) y=$sampleY " +
+                                "section=$sectionIndex populated=$populated airId=${session.blockMapping.airId} " +
+                                "mappingSize=${session.blockMapping.size} blockMappingInitialized=${session.isBlockMappingInitialized} $samples"
+                        )
+                    }
+                } catch (e: Exception) {
+                    if (levelChunkDiagCount <= 5) {
+                        session.displayClientMessage("§c[ChunkDiag] LevelChunkPacket parse FAILED: ${e.javaClass.simpleName}: ${e.message}")
+                    }
+                    // malformed/unexpected chunk data for this protocol version - skip it rather
+                    // than crash the relay
+                }
+            }
+
+            is ClientCacheBlobStatusPacket -> {
+                // Rewrite what the real client reports having cached (acks) into "don't have it"
+                // (naks) before this goes on to the server. Without this, any blob the real
+                // client's on-device cache already had from a previous session never gets resent
+                // at all - the bytes never cross the network, so there's nothing for us to
+                // passively observe no matter what ClientCacheMissResponsePacket handling we add.
+                // Forcing every ack into a nak makes the server treat everything as a cache miss
+                // and resend full data every time, which we can then always track via
+                // ClientCacheMissResponsePacket above. The real client doesn't notice or care -
+                // it just receives fresh data instead of using its local cache; functionally
+                // identical, just slightly less bandwidth-efficient.
+                if (packet.acks.isNotEmpty()) {
+                    packet.naks.addAll(packet.acks)
+                    packet.acks.clear()
+                }
+            }
+
+            is ClientCacheMissResponsePacket -> {
+                if (!session.isBlockMappingInitialized) return
+
+                packet.blobs.forEach { (blobId, data) ->
+                    val target = pendingCacheBlobs.remove(blobId) ?: return@forEach
+                    val (chunkHash, sectionIndex) = target
+                    if (sectionIndex < 0) return@forEach // biome blob - nothing for us to parse
+
+                    try {
+                        val chunk = chunks[chunkHash] ?: return@forEach
+                        chunk.readSubChunk(sectionIndex, data.duplicate())
+                    } catch (e: Exception) {
+                        // same reasoning as the LevelChunkPacket catch above - skip, don't crash
+                    }
+                }
+            }
+
+            is SubChunkPacket -> {
+                if (!session.isBlockMappingInitialized) return
+
+                val center = packet.centerPosition
+                packet.subChunks.forEach { subChunkData ->
+                    try {
+                        if (subChunkDiagCount < 8) {
+                            subChunkDiagCount++
+                            session.displayClientMessage(
+                                "§a[ChunkDiag] #$subChunkDiagCount SubChunk result=${subChunkData.result} " +
+                                    "dataBytes=${subChunkData.data?.readableBytes() ?: -1} " +
+                                    "center=(${center.x},${center.y},${center.z}) offset=${subChunkData.position}"
+                            )
+                        }
+
+                        // Matches ProtoHax's own (confirmed working) SubChunkPacket handling:
+                        // only accept entries the server explicitly marked SUCCESS. Our previous
+                        // "readableBytes() <= 0" heuristic wasn't equivalent - a non-SUCCESS
+                        // result (e.g. chunk not found) could still carry a non-empty buffer we'd
+                        // have wrongly tried to parse as real block data.
+                        if (subChunkData.result != org.cloudburstmc.protocol.bedrock.data.SubChunkRequestResult.SUCCESS) {
+                            return@forEach
+                        }
+
+                        val data = subChunkData.data ?: return@forEach
+                        if (data.readableBytes() <= 0) return@forEach
+
+                        val offset = subChunkData.position
+                        val chunkX = center.x + offset.x
+                        val chunkZ = center.z + offset.z
+                        // centerPosition.y is the signed index of the reference (usually bottom)
+                        // section; offset.y shifts from there. Our own Chunk.sectionStorage is a
+                        // plain 0-based array, so for a 384-world (24 sections, floor at y=-64) we
+                        // shift by +4 to land the lowest legal signed index (-4) on array index 0.
+                        // For the classic 256-world (16 sections, y starts at 0) signed indices are
+                        // already 0-based, so no shift is needed. (Matches ProtoHax's own
+                        // `it.position.add(centerPos).add(0, 4, 0)` - same formula, confirmed.)
+                        val sectionIndex = (center.y + offset.y) + (if (is384WorldSupported) 4 else 0)
+
+                        val chunk = chunks.getOrPut(Chunk.hash(chunkX, chunkZ)) {
+                            Chunk(chunkX, chunkZ, is384WorldSupported, session.blockMapping)
+                        }
+
+                        val buf = data.duplicate()
+                        chunk.readSubChunk(sectionIndex, buf)
+                    } catch (e: Exception) {
+                        if (subChunkDiagCount <= 8) {
+                            session.displayClientMessage("§c[ChunkDiag] SubChunk parse FAILED: ${e.javaClass.simpleName}: ${e.message}")
+                        }
+                        // same reasoning as the LevelChunkPacket catch above - skip, don't crash
+                    }
+                }
+            }
+
+            is UpdateBlockPacket -> {
+                if (packet.dataLayer == 0) {
+                    setBlockIdAt(
+                        packet.blockPosition.x,
+                        packet.blockPosition.y,
+                        packet.blockPosition.z,
+                        packet.definition.runtimeId
+                    )
+                }
+            }
+
+            is UpdateSubChunkBlocksPacket -> {
+                // Batch block-change variant of UpdateBlockPacket - the server uses this for
+                // several simultaneous changes in one subchunk (explosions, redstone, pistons,
+                // etc.) instead of one UpdateBlockPacket per block. We had no handler for this at
+                // all before, so any such batch change left our tracked world state stale until
+                // the whole chunk happened to reload. Each entry already carries an absolute world
+                // position, same as UpdateBlockPacket.blockPosition. Only standardBlocks (the
+                // primary layer) is applied, matching how UpdateBlockPacket above only acts on
+                // dataLayer == 0 - extraBlocks is the secondary/waterlogged layer we don't track.
+                packet.standardBlocks.forEach { entry ->
+                    val pos = entry.position
+                    setBlockIdAt(pos.x, pos.y, pos.z, entry.definition.runtimeId)
+                }
+            }
+
+            is ChunkRadiusUpdatedPacket -> {
+                viewDistance = packet.radius
+            }
+
+            is ChangeDimensionPacket -> {
+                chunks.clear()
+                // Nether (dimension 1) has always been 128-height (8 sections, y0-127) - the
+                // "caves and cliffs" 384-height extension only ever applied to the Overworld
+                // (dimension 0); The End (dimension 2) is 256-height (16 sections). Recomputing
+                // this here (not just once from the game version at StartGamePacket time) matters
+                // because a version-only check stays permanently wrong for any session that ever
+                // visits the Nether - every block read there would look up the wrong section
+                // index (getBlockAt would add the 384-world's +64 Y offset to a coordinate space
+                // that never had one), landing on an unwritten section and reading back
+                // "minecraft:unknown" for genuinely real, already-loaded blocks.
+                //
+                // Reflection here (rather than packet.dimensionId directly) because that exact
+                // property name on this specific bedrock-codec version hasn't been confirmed
+                // against source - same reasoning as GameSession's extractBlockPaletteFromStartGame.
+                // A wrong guess just leaves is384WorldSupported at its version-only value instead
+                // of breaking the build.
+                val dimensionId = readIntPropertyViaReflection(packet, listOf("getDimensionId", "dimensionId", "getDimension"))
+                if (dimensionId != null) {
+                    is384WorldSupported = versionSupports384World && dimensionId == 0
+                }
+                session.displayClientMessage(
+                    "§d[DimensionDiag] ChangeDimension dimensionId=$dimensionId -> is384WorldSupported=$is384WorldSupported"
+                )
+            }
+
+            is AddEntityPacket -> {
+                val entity = EntityUnknown(
+                    packet.runtimeEntityId,
+                    packet.uniqueEntityId,
+                    packet.identifier
+                ).apply {
+                    move(packet.position)
+                    rotate(packet.rotation)
+                    handleSetData(packet.metadata)
+                    handleSetAttribute(packet.attributes)
+                }
+                entityMap[packet.runtimeEntityId] = entity
+            }
+
+            is AddItemEntityPacket -> {
+                val entity = Item(packet.runtimeEntityId, packet.uniqueEntityId).apply {
+                    move(packet.position)
+                    handleSetData(packet.metadata)
+                }
+                entityMap[packet.runtimeEntityId] = entity
+            }
+
+            is AddPlayerPacket -> {
+                val entity = Player(
+                    packet.runtimeEntityId,
+                    packet.uniqueEntityId,
+                    packet.uuid,
+                    packet.username
+                ).apply {
+                    move(packet.position)
+                    rotate(packet.rotation)
+                    handleSetData(packet.metadata)
+                }
+                entityMap[packet.runtimeEntityId] = entity
+            }
+
+            is RemoveEntityPacket -> {
+                val entityToRemove =
+                    entityMap.values.find { it.uniqueEntityId == packet.uniqueEntityId } ?: return
+                entityMap.remove(entityToRemove.runtimeEntityId)
+            }
+
+            is TakeItemEntityPacket -> {
+                entityMap.remove(packet.itemRuntimeEntityId)
+            }
+
+            is PlayerListPacket -> {
+                val add = packet.action == PlayerListPacket.Action.ADD
+                packet.entries.forEach {
+                    if (add) {
+                        playerMap[it.uuid] = it
+                    } else {
+                        playerMap.remove(it.uuid)
+                    }
+                }
+            }
+
+            else -> {
+                entityMap.values.forEach { entity ->
+                    entity.onPacketBound(packet)
+                }
+            }
+        }
+    }
+
+    /**
+     * Approximates vanilla explosion damage falloff for every tracked entity (and any [extraEntities]
+     * not currently in [entityMap], e.g. the local player) around [center].
+     *
+     * This does NOT account for block occlusion/exposure (WClient has no local world/chunk state to
+     * raycast against), so it always assumes full exposure (1.0). Real in-game damage will be lower
+     * whenever blocks are between the explosion and the target. Treat the result as an upper-bound
+     * estimate for target/placement selection, not an exact value.
+     */
+    fun simulateExplosionDamage(
+        center: Vector3f,
+        size: Float,
+        extraEntities: List<Entity> = emptyList(),
+        damageCallback: (Entity, Float) -> Unit
+    ) {
+        val searchRadiusSq = (size * 2).pow(2)
+
+        fun evaluate(entity: Entity) {
+            val distSq = entity.distanceSq(center)
+            if (distSq >= searchRadiusSq) return
+
+            val distance = entity.distance(center) / size
+            if (distance <= 1f) {
+                val impact = 1f - distance
+                val damage = ((impact * impact + impact) / 2f) * 8f * size + 1f
+                damageCallback(entity, damage)
+            }
+        }
+
+        entityMap.values.forEach(::evaluate)
+        extraEntities.forEach(::evaluate)
+    }
+
+    // --- block query/update helpers -----------------------------------------------------------
+
+    fun getChunkAt(chunkX: Int, chunkZ: Int): Chunk? = chunks[Chunk.hash(chunkX, chunkZ)]
+
+    fun isChunkLoaded(x: Int, z: Int): Boolean = chunks.containsKey(Chunk.hash(x shr 4, z shr 4))
+
+    /**
+     * Runtime id of the block at the given world coordinates, or the air runtime id if the
+     * containing chunk hasn't been loaded/tracked (see the notes on the LevelChunkPacket handling
+     * above for when that can happen).
+     */
+    fun getBlockIdAt(x: Int, y: Int, z: Int): Int {
+        val chunk = getChunkAt(x shr 4, z shr 4)
+            ?: return if (session.isBlockMappingInitialized) session.blockMapping.airId else 0
+        return chunk.getBlockAt(x and 0x0f, y, z and 0x0f)
+    }
+
+    fun getBlockIdAt(pos: Vector3i): Int = getBlockIdAt(pos.x, pos.y, pos.z)
+
+    fun getBlockAt(x: Int, y: Int, z: Int): BlockDefinition {
+        if (!session.isBlockMappingInitialized) return UnknownBlockDefinition(0)
+        return session.blockMapping.getDefinition(getBlockIdAt(x, y, z))
+    }
+
+    fun getBlockAt(pos: Vector3i): BlockDefinition = getBlockAt(pos.x, pos.y, pos.z)
+
+    fun setBlockIdAt(x: Int, y: Int, z: Int, runtimeId: Int) {
+        val chunk = getChunkAt(x shr 4, z shr 4) ?: return
+        chunk.setBlockAt(x and 0x0f, y, z and 0x0f, runtimeId)
+    }
+
+    fun isAir(x: Int, y: Int, z: Int): Boolean = getBlockAt(x, y, z).identifier == "minecraft:air"
+
+    fun isAir(pos: Vector3i): Boolean = isAir(pos.x, pos.y, pos.z)
+
+    /**
+     * Bedrock places a new block adjacent to whatever *existing* block you "click" - not directly
+     * at the position you name - so block-placing modules (Surround, PistonCrystal, ...) need to
+     * find a real, currently non-air neighbor of [pos] to click, and which face of that neighbor
+     * points back at [pos]. Checks straight down first (the common "place on the ground" case),
+     * then up, then the four horizontal neighbors.
+     *
+     * Returns null if [pos] itself isn't currently air (already occupied, or the chunk/subchunk
+     * simply isn't tracked yet - see the LevelChunkPacket/ClientCacheMissResponsePacket handling
+     * notes above for the ways that can happen) or if none of its neighbors are known to be
+     * solid, e.g. floating in open air.
+     *
+     * @return (position of the block to click, Bedrock face index of that block to click:
+     *   0=down,1=up,2=north,3=south,4=west,5=east) or null
+     */
+    fun findPlacementReference(pos: Vector3i): Pair<Vector3i, Int>? {
+        if (!isAir(pos)) return null
+
+        // (offset to the neighboring block, face of THAT block which points back at pos)
+        val candidates = listOf(
+            Vector3i.from(0, -1, 0) to 1, // below   -> click its UP face
+            Vector3i.from(0, 1, 0) to 0,  // above   -> click its DOWN face
+            Vector3i.from(1, 0, 0) to 4,  // east    -> click its WEST face
+            Vector3i.from(-1, 0, 0) to 5, // west    -> click its EAST face
+            Vector3i.from(0, 0, 1) to 2,  // south   -> click its NORTH face
+            Vector3i.from(0, 0, -1) to 3  // north   -> click its SOUTH face
+        )
+
+        for ((offset, face) in candidates) {
+            val neighborPos = Vector3i.from(pos.x + offset.x, pos.y + offset.y, pos.z + offset.z)
+            if (!isAir(neighborPos)) {
+                return neighborPos to face
+            }
+        }
+        return null
+    }
+
+    /** Tries each candidate no-arg method name in order, returning the first one that exists and returns an Int. */
+    private fun readIntPropertyViaReflection(target: Any, candidates: List<String>): Int? {
+        for (name in candidates) {
+            try {
+                val method = target.javaClass.getMethod(name)
+                val result = method.invoke(target)
+                if (result is Int) return result
+                if (result is Byte) return result.toInt()
+            } catch (e: NoSuchMethodException) {
+                // try the next candidate name
+            } catch (e: Exception) {
+                // found the method but couldn't read it as an int - try the next candidate
+            }
+        }
+        return null
+    }
+
+}

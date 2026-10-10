@@ -1,0 +1,334 @@
+package com.elainaclient.game
+
+import android.util.Log
+import com.elainaclient.application.AppContext
+import com.elainaclient.game.entity.LocalPlayer
+import com.elainaclient.game.registry.BlockMapping
+import com.elainaclient.game.registry.BlockMappingProvider
+import com.elainaclient.game.registry.ItemMapping
+import com.elainaclient.game.registry.ItemMappingProvider
+import com.elainaclient.game.world.Level
+import com.elainaclient.util.setPacketField
+import com.elainaclient.relay.WRelaySession
+import org.cloudburstmc.protocol.bedrock.data.definitions.ItemDefinition
+import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket
+import org.cloudburstmc.protocol.bedrock.packet.ItemComponentPacket
+import org.cloudburstmc.protocol.bedrock.packet.StartGamePacket
+import org.cloudburstmc.protocol.bedrock.packet.TextPacket
+import org.cloudburstmc.protocol.common.SimpleDefinitionRegistry
+
+@Suppress("MemberVisibilityCanBePrivate")
+class GameSession(val wRelaySession: WRelaySession) : ComposedPacketHandler {
+
+    val localPlayer = LocalPlayer(this)
+    val level = Level(this)
+
+    val protocolVersion: Int
+        get() = wRelaySession.server.codec.protocolVersion
+
+    private val mappingProviderContext = AppContext.instance
+
+    private val blockMappingProvider = BlockMappingProvider(mappingProviderContext)
+    private val itemMappingProvider = ItemMappingProvider(mappingProviderContext)
+
+    lateinit var blockMapping: BlockMapping
+    lateinit var itemMapping: ItemMapping
+
+    // Exposed instead of letting other classes do `session::blockMapping.isInitialized`
+    // directly - checking a lateinit property's isInitialized from outside its declaring
+    // class can fail to compile ("Backing field ... is not accessible at this point"),
+    // so we keep the check here where it's always safe and hand out a plain Boolean.
+    val isBlockMappingInitialized: Boolean
+        get() = ::blockMapping.isInitialized
+
+    private var startGameReceived = false
+
+    // Chat messages sent from inside the StartGamePacket handler (or anything else running that
+    // early in the connection) go nowhere - the RakNet session isn't "spawned" enough yet for the
+    // client to actually display an injected TextPacket, so displayClientMessage() calls there
+    // fail completely silently (confirmed via PacketFlowDiag: messages #1-11, everything up to
+    // and including StartGamePacket's own handler, never appeared in chat at all; #12 onward,
+    // once real post-spawn packets like ItemComponentPacket started flowing, worked fine). Queue
+    // messages here instead of sending them immediately, and flush the queue once we know chat
+    // delivery works (see flushPendingDiagnostics(), called from the first PlayerAuthInputPacket -
+    // the same packet type all the *Diag modules already successfully print through).
+    private val pendingDiagnostics = mutableListOf<String>()
+    private var pendingDiagnosticsFlushed = false
+
+    private fun queueDiagnostic(message: String) {
+        pendingDiagnostics.add(message)
+    }
+
+    private fun flushPendingDiagnostics() {
+        if (pendingDiagnosticsFlushed) return
+        pendingDiagnosticsFlushed = true
+        pendingDiagnostics.forEach { displayClientMessage(it) }
+        pendingDiagnostics.clear()
+    }
+
+    fun clientBound(packet: BedrockPacket) {
+        wRelaySession.clientBound(packet)
+    }
+
+    fun serverBound(packet: BedrockPacket) {
+        wRelaySession.serverBound(packet)
+    }
+
+    // ComposedPacketHandler's default beforeClientBound()/beforeServerBound() both just call
+    // this single method, so modules previously had no way to tell which direction a packet
+    // was going (e.g. AntiCrystalModule rewriting position needs to only touch outgoing/
+    // server-bound packets, not incoming ones). We now override beforeClientBound/
+    // beforeServerBound below instead, so this is only kept to satisfy the interface and
+    // defaults to treating the packet as server-bound if anything else ends up calling it
+    // directly.
+    override fun beforePacketBound(packet: BedrockPacket): Boolean {
+        return handlePacketBound(packet, isClientBound = false)
+    }
+
+    override fun beforeClientBound(packet: BedrockPacket): Boolean {
+        return handlePacketBound(packet, isClientBound = true)
+    }
+
+    override fun beforeServerBound(packet: BedrockPacket): Boolean {
+        return handlePacketBound(packet, isClientBound = false)
+    }
+
+    private var earlyPacketDiagCount = 0
+
+    private fun handlePacketBound(packet: BedrockPacket, isClientBound: Boolean): Boolean {
+        // TEMPORARY: prints the class name of the first 15 packets seen through this method at
+        // all, unconditionally, before anything else can possibly swallow/skip it. If
+        // StartGamePacket never shows up here, handlePacketBound either isn't wired up as the
+        // actual packet listener anymore, or StartGamePacket specifically never reaches it.
+        if (earlyPacketDiagCount < 15) {
+            earlyPacketDiagCount++
+            val direction = if (isClientBound) "S->C" else "C->S"
+            runCatching {
+                queueDiagnostic("§6[PacketFlowDiag] #$earlyPacketDiagCount $direction ${packet.javaClass.simpleName}")
+            }
+        }
+
+        if (!isClientBound && packet is org.cloudburstmc.protocol.bedrock.packet.ClientCacheStatusPacket) {
+            // Force-disable blob (chunk) caching support. WClient has no equivalent to
+            // ProtoHax's BlobCacheManager (async cache-miss/callback infrastructure via
+            // session.scope/cacheManager, which we don't have) - implementing that properly is a
+            // real undertaking. Telling the server the client doesn't support blob caching is the
+            // much simpler fix ProtoHax itself once used (see the commented-out block in its own
+            // BlobCacheManager.kt) before building the full version: the server then always sends
+            // complete inline chunk/subchunk data instead of empty-payload-plus-separate-blob-
+            // fetch, which our existing LevelChunkPacket/SubChunkPacket parsing already handles.
+            // If the server was using blob caching, this is very likely why every block read back
+            // as "unknown" no matter what else got fixed - SubChunkData.data was always empty and
+            // we had nothing to fall back to.
+            packet.isSupported = false
+            Log.i("GameSession", "Disabled client blob cache support (ClientCacheStatusPacket) so the server sends full chunk data instead of cache-miss blobs we can't fetch")
+        }
+
+        if (packet is org.cloudburstmc.protocol.bedrock.packet.PlayerAuthInputPacket) {
+            flushPendingDiagnostics()
+        }
+
+        when (packet) {
+            is StartGamePacket -> {
+                try {
+                    val itemDefinitions = SimpleDefinitionRegistry.builder<ItemDefinition>()
+                        .addAll(packet.itemDefinitions)
+                        .build()
+
+                    wRelaySession.server.peer.codecHelper.itemDefinitions = itemDefinitions
+                    wRelaySession.client?.peer?.codecHelper?.itemDefinitions = itemDefinitions
+
+                    Log.i("GameSession", "Successfully set up codecHelper itemDefinitions: ${packet.itemDefinitions.size} items")
+                } catch (e: Exception) {
+                    Log.e("GameSession", "Failed to set up codecHelper itemDefinitions", e)
+                }
+
+                if (!startGameReceived) {
+                    startGameReceived = true
+                    Log.i("GameSession", "StartGamePacket received")
+
+                    // BlockPropertyData (StartGamePacket.blockProperties) only carries a block's
+                    // *name* (no runtime id field exists on it at all - confirmed against the real
+                    // bedrock-codec source) and, on most servers, is a *small list of custom/extra
+                    // blocks only* - not the full vanilla block table. BlockMapping.fromPalette()
+                    // hash-sorts whatever list it's given and assigns sequential runtime ids to
+                    // that order, which is only valid if the list is genuinely complete: hash-
+                    // sorting a 98-entry subset and calling the result "runtime ids" produces
+                    // numbers that don't correspond to anything the real server/client agree on.
+                    // That's exactly what was happening here - a small, technically-non-empty
+                    // "live palette" was winning over the bundled asset (which already showed
+                    // 4687 real, correctly-assigned entries for this exact protocol) purely
+                    // because it didn't throw, even though it was structurally incapable of being
+                    // correct. Bundled asset now always loads first as the real primary source;
+                    // the "live" hash-sort path is kept only as a last-resort fallback for when no
+                    // bundled asset exists at all for this protocol version.
+                    var blockMappingSource = "none"
+
+                    try {
+                        blockMapping = blockMappingProvider.craftMapping(protocolVersion)
+                        blockMappingSource = "bundled asset (protocol $protocolVersion)"
+                        Log.i("GameSession", "Loaded block mapping for protocol $protocolVersion")
+                    } catch (e: Exception) {
+                        Log.e("GameSession", "Failed to load bundled block mapping for protocol $protocolVersion, trying the server's own (partial) StartGamePacket palette as a last resort", e)
+                        queueDiagnostic("§c[BlockMappingCheck] bundled asset FAILED: ${e.javaClass.simpleName}: ${e.message}")
+
+                        val livePalette = extractBlockPaletteFromStartGame(packet)
+                        if (livePalette != null) {
+                            try {
+                                blockMapping = BlockMapping.fromPalette(livePalette)
+                                blockMappingSource = "live (${livePalette.size} palette entries, low confidence)"
+                                Log.w("GameSession", "Falling back to a hash-sorted live palette (${livePalette.size} entries) - this is only reliable if blockProperties happened to contain the complete block list")
+                            } catch (e2: Exception) {
+                                Log.e("GameSession", "Live palette fallback also failed", e2)
+                                queueDiagnostic("§c[BlockMappingCheck] live palette fallback ALSO FAILED: ${e2.javaClass.simpleName}: ${e2.message}")
+                            }
+                        }
+                    }
+
+                    // Independent of however blockMapping above turned out - itemMapping (used for
+                    // hotbar/inventory item lookups, unrelated to block placement) always gets its
+                    // own attempt, so a block-mapping failure can't leave it unset too.
+                    try {
+                        itemMapping = itemMappingProvider.craftMapping(protocolVersion)
+                        Log.i("GameSession", "Loaded item mapping for protocol $protocolVersion")
+                    } catch (e: Exception) {
+                        Log.e("GameSession", "Failed to load item mapping for protocol $protocolVersion", e)
+                        queueDiagnostic("§c[ItemMappingCheck] FAILED: ${e.javaClass.simpleName}: ${e.message}")
+                    }
+
+                    // CRITICAL: codecHelper.blockDefinitions was never being set (only
+                    // itemDefinitions was, above/in ItemComponentPacket) - meaning the actual
+                    // packet encoder/decoder was reading and writing every block-definition field
+                    // on every packet (SubChunkPacket's block data, InventoryTransactionPacket's
+                    // blockDefinition, etc.) using its own default/empty registry instead of the
+                    // real per-server blockMapping we just built above. That's consistent with
+                    // what packet logging showed: a fixed, wrong block definition (birch_hanging_
+                    // sign) no matter what was actually being clicked - and it would equally well
+                    // explain the world's block data (via SubChunkPacket) never looking right,
+                    // which is why canPlaceCrystal/findValidPlacement kept rejecting everything.
+                    if (isBlockMappingInitialized) {
+                        try {
+                            wRelaySession.server.peer.codecHelper.blockDefinitions = blockMapping
+                            wRelaySession.client?.peer?.codecHelper?.blockDefinitions = blockMapping
+                            Log.i("GameSession", "Successfully set up codecHelper blockDefinitions")
+                        } catch (e: Exception) {
+                            Log.e("GameSession", "Failed to set up codecHelper blockDefinitions", e)
+                        }
+                    }
+
+                    // Chat-visible sanity check (no logcat needed): if the block mapping's runtime
+                    // ids actually line up with what the server sent, looking up a few extremely
+                    // common identifiers must resolve to themselves. If BlockMapping.fromPalette's
+                    // hash disagreed with the server's own hash (the bug this comment sits next to
+                    // was written to fix), this line would previously have nothing useful to show -
+                    // getRuntimeIdByIdentifier would still "succeed" (it just linear-scans our own
+                    // possibly-wrong map for a matching name), so the real tell was always blocks
+                    // read back as minecraft:unknown / an item's own embedded block definition
+                    // decoding as something unrelated (see BlockMapping.fromPalette's doc). Shown
+                    // once per connection so it doesn't spam chat.
+                    if (isBlockMappingInitialized) {
+                        queueDiagnostic(
+                            "§b[BlockMappingCheck] §fsource=$blockMappingSource, entries=${blockMapping.size}, " +
+                                "obsidian runtimeId=${blockMapping.getRuntimeIdByIdentifier("minecraft:obsidian")}, " +
+                                "air runtimeId=${blockMapping.airId}"
+                        )
+                    } else {
+                        // Both the live-palette and bundled-asset paths above threw (each already
+                        // reported its own error above) - blockMapping was never assigned at all,
+                        // so codecHelper.blockDefinitions below is skipped too. This is the one
+                        // case that would otherwise fail completely silently from the chat's point
+                        // of view (Log.e alone is invisible without adb/Android Studio).
+                        queueDiagnostic("§c[BlockMappingCheck] blockMapping was NEVER initialized - see the FAILED message(s) above")
+                    }
+                }
+            }
+
+            is ItemComponentPacket -> {
+                try {
+                    val itemDefinitions = SimpleDefinitionRegistry.builder<ItemDefinition>()
+                        .addAll(packet.items)
+                        .build()
+
+                    wRelaySession.server.peer.codecHelper.itemDefinitions = itemDefinitions
+                    wRelaySession.client?.peer?.codecHelper?.itemDefinitions = itemDefinitions
+
+                    Log.i("GameSession", "Successfully updated codecHelper from ItemComponentPacket: ${packet.items.size} items")
+                } catch (e: Exception) {
+                    Log.e("GameSession", "Failed to update codecHelper from ItemComponentPacket", e)
+                }
+            }
+        }
+
+        localPlayer.onPacketBound(packet)
+        level.onPacketBound(packet)
+
+        val interceptablePacket = InterceptablePacket(packet, isClientBound)
+
+        for (module in ModuleManager.modules) {
+            // Set session if not already set
+            if (!module.isSessionCreated) {
+                module.session = this
+            }
+            module.beforePacketBound(interceptablePacket)
+            if (interceptablePacket.isIntercepted) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    override fun afterPacketBound(packet: BedrockPacket) {
+        for (module in ModuleManager.modules) {
+            module.afterPacketBound(packet)
+        }
+    }
+
+    override fun onDisconnect(reason: String) {
+        localPlayer.onDisconnect()
+        level.onDisconnect()
+        startGameReceived = false
+        earlyPacketDiagCount = 0
+        pendingDiagnostics.clear()
+        pendingDiagnosticsFlushed = false
+
+        for (module in ModuleManager.modules) {
+            module.onDisconnect(reason)
+        }
+    }
+
+    fun displayClientMessage(message: String, type: TextPacket.Type = TextPacket.Type.RAW) {
+        val textPacket = TextPacket()
+        textPacket.type = type
+        textPacket.sourceName = ""
+        textPacket.setPacketField("message", message)
+        textPacket.xuid = ""
+        textPacket.platformChatId = ""
+        textPacket.setPacketField("filteredMessage", "")
+        clientBound(textPacket)
+    }
+
+    /**
+     * Reflection-based lookup for StartGamePacket's block palette. Used instead of referencing a
+     * property directly (like `packet.itemDefinitions` above) because - unlike itemDefinitions,
+     * which is already used elsewhere in this codebase against the current bedrock-codec version
+     * and therefore known to exist - the exact accessor name for the block palette on this specific
+     * library version hasn't been confirmed against source. Trying several plausible candidates via
+     * reflection means a wrong guess here just falls through to the next candidate (or the bundled
+     * asset fallback) instead of breaking the build.
+     */
+    /**
+     * Reads the server's own block palette directly off StartGamePacket. Confirmed via the real
+     * bedrock-codec source: the field is `blockProperties: List<BlockPropertyData>` (not the
+     * NbtMap list this code originally guessed at and reflection-searched several possible names
+     * for) - each entry has a plain `.name: String` and `.properties: NbtMap`, no runtimeId field
+     * at all. No more reflection/guessing needed now that this is confirmed.
+     */
+    private fun extractBlockPaletteFromStartGame(
+        packet: StartGamePacket
+    ): List<org.cloudburstmc.protocol.bedrock.data.BlockPropertyData>? {
+        val list = packet.blockProperties
+        return list.takeIf { it.isNotEmpty() }
+    }
+
+}

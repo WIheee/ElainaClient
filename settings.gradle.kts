@@ -32,7 +32,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "WClient"
+rootProject.name = "ElainaClient"
 include(":app")
 include(":relay")
 include(

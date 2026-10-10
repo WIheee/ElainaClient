@@ -107,7 +107,7 @@ requested protocol (or the lowest registered if the client is older than all of 
    `api(project(":relay:Protocol:…"))`.
 4. Adapt each vendored module's `build.gradle.kts`: they use *their own* type-safe accessors
    (`projects.bedrockCodec`, `libs.netty.transport.raknet`, `libs.snappy`) and bring
-   `maven-publish`/`signing`/javadoc jars — rewire to WClient's `gradle/libs.versions.toml` and drop
+   `maven-publish`/`signing`/javadoc jars — rewire to the project's `gradle/libs.versions.toml` and drop
    the publishing/signing bits.
 5. Watch the R8 `RakChannel` duplicate-class trap (**#8**): do **not** leave a project
    `transport-raknet` on the classpath together with Maven's `netty-transport-raknet`.

@@ -3,7 +3,7 @@
 -keep class io.netty.** { *; }
 -keep class org.cloudburstmc.netty.** { *; }
 -keep class org.cloudburstmc.protocol.bedrock.codec.** { *; }
-# com.retrivedmods.wclient.util.PacketFieldUtil sets several packet fields (TextPacket.message,
+# com.elainaclient.util.PacketFieldUtil sets several packet fields (TextPacket.message,
 # MovePlayerPacket.onGround, PlayerHotbarPacket.selectHotbarSlot, etc.) via raw reflection using
 # string field names, because those fields no longer have public setters in the current Bedrock
 # protocol library. Nothing else in the app references those fields by name, so without a keep

@@ -3,7 +3,7 @@ plugins {
     kotlin("jvm")
 }
 
-group = "com.retrivedmods.wrelay"
+group = "com.elainaclient.relay"
 version = "1.0-SNAPSHOT"
 
 java {

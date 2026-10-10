@@ -1,4 +1,4 @@
-import org.jetbrains.kotlin.compose.compiler.gradle.ComposeFeatureFlag
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.application)
@@ -9,11 +9,11 @@ plugins {
 }
 
 android {
-    namespace = "com.retrivedmods.wclient"
+    namespace = "com.elainaclient"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.retrivedmods.wclient"
+        applicationId = "com.elainaclient"
         minSdk = 28
         //noinspection OldTargetApi,EditedTargetSdkVersion
         targetSdk = 35
@@ -78,17 +78,15 @@ android {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
     }
-    kotlinOptions {
-        jvmTarget = "21"
-    }
     composeCompiler {
         includeTraceMarkers = false
         includeSourceInformation = false
-        generateFunctionKeyMetaClasses = false
-        featureFlags = setOf(
-            ComposeFeatureFlag.OptimizeNonSkippingGroups,
-            ComposeFeatureFlag.PausableComposition
-        )
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_21)
     }
 }
 

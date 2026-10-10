@@ -4,7 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-WClient is an Android utility/modification client for **Minecraft Bedrock Edition (MCPE)**. It does
+ElainaClient (a fork of the WClient project) is an Android utility/modification client for
+**Minecraft Bedrock Edition (MCPE)**. It does
 not touch game memory. Instead it is an on-device **MITM proxy**: it runs a local RakNet/Bedrock
 server that a real MCPE client connects to, opens a second connection out to the real server, and
 sits in the middle of the packet stream. Modules observe/rewrite/inject/suppress packets in either
@@ -15,9 +16,9 @@ treat module *behavior* as given, don't extend it speculatively.
 
 ## Modules (Gradle)
 
-- `:app` — Android application (`com.retrivedmods.wclient`). Compose UI + the module system + the
+- `:app` — Android application (`com.elainaclient`). Compose UI + the module system + the
   game-state model. Depends on `:relay`.
-- `:relay` — plain Kotlin/JVM library (`com.retrivedmods.wrelay`). The proxy engine: RakNet server,
+- `:relay` — plain Kotlin/JVM library (`com.elainaclient.relay`). The proxy engine: RakNet server,
   upstream client, codec negotiation, packet listeners, auth handshake. **No Android SDK dependency** —
   it can't use `android.util.Log`; it logs via `println` (visible in logcat for the app process).
 - `relay/Network/*` (codec-query, codec-rcon, transport-raknet) — vendored, listed in
@@ -32,7 +33,7 @@ treat module *behavior* as given, don't extend it speculatively.
 ./gradlew :app:assembleDebug            # debug APK (signed with buildKey.jks, alias UntrustedKey, pw 123456)
 ./gradlew :app:assembleRelease          # release APK (R8 minify + shrink, fullMode on)
 ./gradlew :relay:test                   # relay unit tests (JUnit 5 / useJUnitPlatform)
-./gradlew :relay:test --tests "com.retrivedmods.wrelay.SomeTest"   # single relay test
+./gradlew :relay:test --tests "com.elainaclient.relay.SomeTest"   # single relay test
 ./gradlew :app:testDebugUnitTest        # app unit tests (JUnit 4)
 ./gradlew :app:connectedDebugAndroidTest  # instrumented tests (needs a device/emulator)
 ```
@@ -118,7 +119,7 @@ window) draws HUDs/ESP; `RelayService` is a foreground service (`:relay` process
   `onEnabled`/`onDisabled`. Modules with `private = true` are excluded from config save/export.
 - `ModuleManager` (object) — the single registry. **New modules must be added to its `init` block**;
   there is no auto-discovery. `saveConfig`/`loadConfig` persist to
-  `filesDir/configs/UserConfig.json` (external export goes to `Documents/WClient/configs`).
+  `filesDir/configs/UserConfig.json` (external export goes to `Documents/ElainaClient/configs`).
 - `ComposedPacketHandler` / `InterruptiblePacketHandler` — the module packet hooks. `beforePacketBound`
   returns whether to swallow; `afterPacketBound`/`onDisconnect` are optional.
 - `ModuleValues.kt` — `AutoConfiguration` builds typed settings (`boolValue`, `floatValue`, `intValue`,
@@ -144,18 +145,38 @@ register them; `CommandHandlerModule` (misc) routes incoming chat into it.
 
 `game/AccountManager.kt` persists `BedrockAuthManager` sessions as JSON under `cacheDir/accounts/`,
 refreshing tokens every 30 min. `AccountManager.GAME_VERSION` and `util/MinecraftUtils.RECOMMENDED_VERSION`
-must stay in sync. `service/RealmsManager.kt` and `game/RealmsAuthFlow.kt` handle Realms listing/join.
-Login to Mojang/Xbox uses `net.raphimc:MinecraftAuth`.
+must stay in sync. Login to Mojang/Xbox uses `net.raphimc:MinecraftAuth`.
 
-### UI (`app`)
+Note: the **Realms UI page was removed**, but the backend stays — `AccountManager` still calls
+`RealmsManager.updateSession(...)` (`service/RealmsManager.kt`) and `AuthWebView` uses
+`RealmsAuthFlow.BEDROCK_ANDROID_APPLICATION_CONFIG` (`game/RealmsAuthFlow.kt`). The ad-gate is gone
+entirely (`auth/VerificationManager.kt` and `ui/component/VerificationDialog.kt` were deleted).
 
-Compose + Navigation (`Navigation.kt` → `MainScreen`). `MainScreen` renders an animated `IconSidebar` over
-six pages (`router/main/*Page.kt`) selected by `MainScreenViewModel`: Home (start/stop capture, pick target
-game), Account, Server, Realms, Settings, About. Theming in `ui/theme/Theme.kt`. Game settings persist
-in `SharedPreferences("game_settings")`.
+### UI (`app`) — portrait, Material 3
+
+`MainActivity` is locked to **portrait** and runs full-screen immersive (`setupImmersiveMode()` hides the
+system bars), then just `ElainaClientTheme { Navigation() }` — there is **no loading screen and no
+ad-gate/verification** (both were removed). Theme entry is `ElainaClientTheme`; colors are the violet
+`WColors` palette in `ui/theme/Theme.kt`.
+
+`Navigation.kt` is a thin single-destination `NavHost` → `MainScreen` (`router/main/MainScreen.kt`). The
+shell is a `Column`: the selected page fills the top, and a **Material 3 bottom `NavigationBar`**
+(icons + labels) sits below it. Pages are the `MainScreenPages` enum (Home / Account / Server / Settings /
+About), selected via `MainScreenViewModel`; each page owns its **own `Scaffold` + `TopAppBar`** (title
+left-aligned) — the shell deliberately adds no outer top bar (would duplicate it).
+
+`ServerPage` lists a few presets plus **user-added custom servers** (FAB dialog; persisted as JSON under
+the `custom_servers` key of `SharedPreferences("game_settings")`). `HomePage` starts/stops the relay and
+picks the target game. Game settings also persist in `SharedPreferences("game_settings")`.
 
 ## Conventions & gotchas
 
+- This is a **fork branded ElainaClient** (app package/applicationId `com.elainaclient`, relay
+  `com.elainaclient.relay`, app label + Compose theme `ElainaClientTheme`, violet `WColors`). UI is
+  portrait Material 3. The original GPLv3 `LICENSE` is kept as-is; `README.md` credits the upstream
+  WClient project and CloudburstMC/Protocol.
+- Removed from this fork: the Realms UI page, the startup loading screen, and the ad-gate
+  (`VerificationManager`/`VerificationDialog`). Don't reintroduce them.
 - The codebase carries unusually long explanatory comments documenting past Bedrock-protocol workarounds
   (blob-cache disabling in `GameSession`, block-mapping source ordering, v2168/v2193 codec registration,
   the Beta1→Beta12/13 dependency jump). Read them before changing adjacent behavior — they encode

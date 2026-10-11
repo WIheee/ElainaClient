@@ -22,6 +22,16 @@ Modules are grouped into categories:
 Per-module settings, the enabled set and shortcuts persist as JSON (`UserConfig.json`), exportable to
 `Documents/ElainaClient/configs`. Chat commands are `.`-prefixed.
 
+## Interface
+
+- **Adaptive home** — a Material 3 shell (bottom navigation on phones, a rail on wide screens) with a
+  dashboard for the account, target game, server and service status.
+- **Light / dark** — follows the system by default, with a manual 系统 / 浅色 / 深色 override in
+  Settings. In-game overlays stay dark (they sit over the game).
+- **Click-GUI themes** — Classic / Kitsu / Grace / Protohax, selectable in Settings.
+- **In-game notifications** — non-intrusive top-centre toasts for module toggles and other events.
+- Chinese UI throughout.
+
 ## Building
 
 Requirements: **JDK 21**, Android SDK (compileSdk 36). The Gradle wrapper is included.
@@ -54,6 +64,23 @@ GPLv3 — see [LICENSE](LICENSE). Redistributed/modified versions must ship thei
 - Uses **CloudburstMC/Protocol** (`bedrock-codec` / `bedrock-connection` / `common`) for the Bedrock
   protocol; `relay/Protocol` contains the vendored source (see its `LICENSE`).
 - Xbox/Mojang login via `net.raphimc:MinecraftAuth`.
+
+Thanks to the open-source projects this app is built on (each under its own license):
+
+**Bedrock protocol / networking**
+- [CloudburstMC/Protocol](https://github.com/CloudburstMC/Protocol) — `bedrock-codec`, `bedrock-connection`, `common`
+- [CloudburstMC/Network](https://github.com/CloudburstMC/Network) — `codec-query`, `codec-rcon`, `transport-raknet`
+- [CloudburstMC/NBT](https://github.com/CloudburstMC/NBT) · [CloudburstMC/math](https://github.com/CloudburstMC/math)
+- [Netty](https://netty.io) · [fastutil](https://github.com/vigna/fastutil) · [aircompressor](https://github.com/airlift/aircompressor)
+- [MinecraftAuth](https://github.com/RaphiMC/MinecraftAuth) (RaphiMC) · [jose4j](https://bitbucket.org/b_c/jose4j)
+
+**Android / UI**
+- [AndroidX](https://developer.android.com/jetpack/androidx) & [Jetpack Compose](https://developer.android.com/jetpack/compose) (incl. Material 3, Navigation, Lifecycle, Activity)
+- [Kotlin](https://kotlinlang.org) · [kotlinx.coroutines](https://github.com/Kotlin/kotlinx.coroutines) · [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization)
+- [OkHttp](https://square.github.io/okhttp/) (Square) · [Coil](https://github.com/coil-kt/coil) · [androidx.browser](https://developer.android.com/jetpack/androidx/releases/browser) (Chrome Custom Tabs)
+
+**Text / serialization / logging**
+- [Gson](https://github.com/google/gson) · [Jackson](https://github.com/FasterXML/jackson) · [Kyori Adventure](https://github.com/KyoriPowered/adventure) · [Apache Log4j 2](https://logging.apache.org/log4j/2.x/)
 
 ## Disclaimer
 

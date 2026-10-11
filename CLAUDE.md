@@ -111,8 +111,9 @@ definitions/block mappings from `StartGamePacket`, and dispatches every packet t
 overrides `beforeClientBound`/`beforeServerBound` separately so modules can tell packet direction via
 `InterceptablePacket.isClientBound`.
 
-An always-on overlay (`OverlayManager` + `render/RenderOverlayView` as a `TYPE_APPLICATION_OVERLAY`
-window) draws HUDs/ESP; `RelayService` is a foreground service (`:relay` process) that keeps things alive.
+`OverlayManager` (`TYPE_APPLICATION_OVERLAY` windows) hosts the launcher button, the per-module
+shortcut buttons, the click GUI, the notification toasts, and the HUD/ESP overlays;
+`RelayService` is a foreground service (`:relay` process) that keeps things alive.
 
 ### Module system (`app/game`)
 
@@ -156,29 +157,65 @@ login MSA config (`BEDROCK_ANDROID_APPLICATION_CONFIG`) that `AuthWebView` uses 
 `ui/component/AuthWebView.kt`. The ad-gate is gone entirely (`auth/VerificationManager.kt` and
 `ui/component/VerificationDialog.kt` were deleted).
 
-### UI (`app`) — portrait, Material 3
+### UI (`app`) — Material 3, adaptive light/dark
 
-`MainActivity` is locked to **portrait** and runs full-screen immersive (`setupImmersiveMode()` hides the
-system bars), then just `ElainaClientTheme { Navigation() }` — there is **no loading screen and no
-ad-gate/verification** (both were removed). Theme entry is `ElainaClientTheme`; colors are the violet
-`WColors` palette in `ui/theme/Theme.kt`.
+`MainActivity` is locked to **portrait** and runs full-screen immersive, then
+`ElainaClientTheme(darkTheme = AppTheme.isDark()) { Navigation() }` — there is **no loading screen and
+no ad-gate/verification** (both were removed). `Navigation.kt` is a thin single-destination `NavHost`
+→ `MainScreen`.
 
-`Navigation.kt` is a thin single-destination `NavHost` → `MainScreen` (`router/main/MainScreen.kt`). The
-shell is a `Column`: the selected page fills the top, and a **Material 3 bottom `NavigationBar`**
-(icons + labels) sits below it. Pages are the `MainScreenPages` enum (Home / Account / Server / Settings /
-About), selected via `MainScreenViewModel`; each page owns its **own `Scaffold` + `TopAppBar`** (title
-left-aligned) — the shell deliberately adds no outer top bar (would duplicate it).
+**Home shell** (`router/main/MainScreen.kt`) is ported from LuminaCN-2.1.0: an adaptive shell —
+left `NavigationRail` in landscape / bottom `NavigationBar` in portrait — over the `MainScreenPages`
+enum (**主页 / 账号 / 关于 / 设置**), selected via `MainScreenViewModel.selectedPage` and swapped with
+a direction-aware `AnimatedContent`. Each page still owns its own `Scaffold` + `TopAppBar`.
 
-`ServerPage` lists a few presets plus **user-added custom servers** (FAB dialog; persisted as JSON under
-the `custom_servers` key of `SharedPreferences("game_settings")`). `HomePage` starts/stops the relay and
-picks the target game. Game settings also persist in `SharedPreferences("game_settings")`.
+**Dashboard** (`HomePage.kt` → `HomePageContent`): account card, game picker, server config (IP/port),
+a collapsible server-list card, and a service-status card, plus an `ExtendedFloatingActionButton` that
+runs the overlay + notification permission flow, then `Services.toggle(...)`. There is **no separate
+server page** any more — presets + user-added custom servers (persisted as JSON under the
+`custom_servers` key of `SharedPreferences("game_settings")`) live inside the dashboard card via
+`ServerPage.kt`'s content-only `ServerListContent()`.
+
+**Theme**: `ui/theme/Theme.kt` keeps the violet `WColors` palette, but `WColors` is now used **only by
+the always-dark overlay HUDs**. App pages use `MaterialTheme.colorScheme` so they follow the light/dark
+scheme. Appearance is `ui/theme/ThemeMode.kt` (`object AppTheme`, values `SYSTEM/LIGHT/DARK`, persisted
+in `SharedPreferences("settings")` under `theme_mode`) and is chosen in `SettingsPage`. Overlays stay
+dark (they sit over the game): `OverlayManager` wraps every overlay's `Content()` in
+`ElainaClientTheme { ... }`.
+
+**Overlays / click GUI**: `OverlayManager` owns the launcher button, per-module shortcut buttons, and
+the click GUI. The click GUI is skinned by a selectable `GUITheme` (`overlay/GUITheme.kt`: CLASSIC /
+KITSU / GRACE / PROTOHAX). **`KITSU` has its own layout** (`overlay/gui/kitsu/KitsuGUI.kt` +
+`KitsuModuleContent.kt`, ported from LuminaCN-2.1.0's `kitsugui/*`: 660×500 card, logo + category
+sidebar, header link/close buttons, its own module-card renderer). CLASSIC / GRACE / PROTOHAX share the
+classic layout (`overlay/gui/classic/OverlayClickGUI.kt`) re-skinned by palette. `GUITheme.createClickGUI()`
+(`overlay/gui/GuiThemeProvider.kt`) maps theme → window; `OverlayManager.openClickGUI()` builds it lazily
+and `applyTheme()` re-attaches overlays after a change. Palettes live in `game/ClickGuiStyle.kt` +
+`LocalClickGuiStyle` (CLASSIC's `ModuleContent`/`ConfigurationScreen` read it through `@Composable` colour
+getters; KitsuGUI provides `ClickGuiStyle.Kitsu`). In-game toasts are
+`overlay/notify/OverlayNotificationManager.show(message, type, durationMs)` — a non-touchable top-centre
+`OverlayWindow`; `Module.sendToggleMessage` fires one on every enable/disable.
+
+**本地化 (汉化)**: overlay/click-GUI labels are English identifiers. `game/ModuleNames.kt`
+(`String.localizedModule()` / `localizedOption()`) maps module + option names to Chinese, falling back
+to `util/TranslationUtil.kt`'s `translatedSelf`. **Add new modules to its `MODULE_NAMES` map.** HUD
+fixed text (coordinates, target status, pie-chart legend …) is localised inline in the `overlay/hud/*`
+files.
 
 ## Conventions & gotchas
 
 - This is a **fork branded ElainaClient** (app package/applicationId `com.elainaclient`, relay
-  `com.elainaclient.relay`, app label + Compose theme `ElainaClientTheme`, violet `WColors`). UI is
-  portrait Material 3. The original GPLv3 `LICENSE` is kept as-is; `README.md` credits the upstream
-  WClient project and CloudburstMC/Protocol.
+  `com.elainaclient.relay`, app label + Compose theme `ElainaClientTheme`, violet accent). UI is
+  portrait Material 3 with an adaptive (rail/bar) shell. The original GPLv3 `LICENSE` is kept as-is;
+  `README.md` credits the upstream WClient project and CloudburstMC/Protocol.
+- **Colour rule**: app pages use `MaterialTheme.colorScheme` (they must follow light/dark). `WColors`
+  is the dark **overlay-only** palette — don't reach for it in app UI. `ui/component/WComponents.kt`
+  is theme-aware and uses a **static** glow (the per-frame `rememberInfiniteTransition` glow was
+  removed for performance — don't reintroduce animated shadows).
+- **Overlay HUD perf**: the `overlay/hud/*` animations are gated so they only tick when needed
+  (`ArrayList`/`Crosshair`/`Coordinates` skip their loop in STATIC colour mode; `WaterMark` runs at
+  ~20 fps). `ArrayListModule` pushes to the overlay only when the enabled set changes, and
+  `ModuleContent`'s list is keyed — keep it that way.
 - Removed from this fork: Realms (UI *and* backend), the startup loading screen, and the ad-gate
   (`VerificationManager`/`VerificationDialog`). Don't reintroduce them.
 - The codebase carries unusually long explanatory comments documenting past Bedrock-protocol workarounds

@@ -217,8 +217,14 @@ files.
   changes, and `ModuleContent`'s list is keyed — keep it that way.
 - The on-screen module list ("ArrayList") HUD is the Horion-style `HorionArrayList` custom View
   (ported from the `openhal4a` project, under `overlay/hud/horion/`), embedded via `AndroidView` in
-  `ArrayListOverlay`; `ArrayListModule`'s options are mapped onto it. Same for the click-GUI: KITSU
-  is LuminaCN's layout (`overlay/gui/kitsu/`). Both are third-party ports — credit in `README.md`.
+  `ArrayListOverlay`; `ArrayListModule`'s options are mapped onto it. **Read every option in the
+  composable body, never inside `AndroidView`'s `update` lambda** — state read only inside `update`
+  didn't reliably recompose, which is what made items show up only after toggling twice. Same for the
+  click-GUI: KITSU is LuminaCN's layout (`overlay/gui/kitsu/`). Both are third-party ports — credit in
+  `README.md`.
+- Minecraft font: `res/font/minecraft.ttf` (the full ~16 MB font) backs `FontStyle.MINECRAFT` in the
+  ArrayList (`ResourcesCompat.getFont`) and `WaterMarkOverlay`; it replaced the old small `minecraft.otf`.
+- The enable/disable chat line (`Module.sendToggleMessage`) uses the theme-violet `§d` brand tag, not red.
 - Removed from this fork: Realms (UI *and* backend), the startup loading screen, and the ad-gate
   (`VerificationManager`/`VerificationDialog`). Don't reintroduce them.
 - The codebase carries unusually long explanatory comments documenting past Bedrock-protocol workarounds

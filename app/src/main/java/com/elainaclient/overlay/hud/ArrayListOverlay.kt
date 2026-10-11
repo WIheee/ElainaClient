@@ -180,7 +180,8 @@ class ArrayListOverlay : OverlayWindow() {
         if (!isOverlayEnabled()) return
 
         val context = LocalContext.current
-        val density = context.resources.displayMetrics.scaledDensity
+        // scaledDensity is deprecated; the equivalent is density * fontScale.
+        val density = context.resources.displayMetrics.density * context.resources.configuration.fontScale
         val trackedIds = remember { mutableSetOf<Int>() }
         val minecraftTypeface = remember(context) {
             runCatching { ResourcesCompat.getFont(context, R.font.minecraft) }.getOrNull()

@@ -29,6 +29,8 @@ Per-module settings, the enabled set and shortcuts persist as JSON (`UserConfig.
 - **Light / dark** — follows the system by default, with a manual 系统 / 浅色 / 深色 override in
   Settings. In-game overlays stay dark (they sit over the game).
 - **Click-GUI themes** — Classic / Kitsu / Grace / Protohax, selectable in Settings.
+- **Module list HUD** — a Horion-style on-screen list of enabled modules (rainbow/category colours,
+  outline/edge styles, adjustable size & spacing, optional Minecraft font).
 - **In-game notifications** — non-intrusive top-centre toasts for module toggles and other events.
 - Chinese UI throughout.
 

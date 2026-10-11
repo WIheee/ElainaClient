@@ -21,14 +21,15 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.elainaclient.R
-import com.elainaclient.ui.theme.WColors
 import com.elainaclient.util.LocalSnackbarHostState
 import com.elainaclient.util.SnackbarHostStateScope
 import com.elainaclient.viewmodel.MainScreenViewModel
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.launch
 
 data class ServerInfo(
     val name: String,
@@ -102,179 +103,154 @@ val servers = listOf(
     ),
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Content-only server picker (no Scaffold/TopAppBar), embedded in the home dashboard.
+ * The list is a plain, non-scrolling Column so it nests inside the dashboard's scroll.
+ */
 @Composable
-fun ServerPageContent() {
-    SnackbarHostStateScope {
-        val mainScreenViewModel: MainScreenViewModel = viewModel()
-        val snackbarHostState = LocalSnackbarHostState.current
-        val context = LocalContext.current
-        var customServers by remember { mutableStateOf(loadCustomServers(context)) }
-        var selectedServer by remember { mutableStateOf<ServerInfo?>(null) }
-        var showSubServers by remember { mutableStateOf(false) }
-        var selectedSubServer by remember { mutableStateOf<SubServerInfo?>(null) }
-        var showAddDialog by remember { mutableStateOf(false) }
+fun ServerListContent(
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(0.dp)
+) {
+    val mainScreenViewModel: MainScreenViewModel = viewModel()
+    val context = LocalContext.current
+    val snackbarHostState = LocalSnackbarHostState.current
+    val coroutineScope = rememberCoroutineScope()
+    val model by mainScreenViewModel.captureModeModel.collectAsStateWithLifecycle()
+    var customServers by remember { mutableStateOf(loadCustomServers(context)) }
+    var selectedServer by remember { mutableStateOf<ServerInfo?>(null) }
+    var selectedSubServer by remember { mutableStateOf<SubServerInfo?>(null) }
+    var showSubServers by remember { mutableStateOf(false) }
+    var showAddDialog by remember { mutableStateOf(false) }
 
-        fun selectTarget(server: ServerInfo, sub: SubServerInfo?) {
-            selectedServer = server
-            selectedSubServer = sub
-            mainScreenViewModel.selectCaptureModeModel(
-                mainScreenViewModel.captureModeModel.value.copy(
-                    serverHostName = sub?.address ?: server.address,
-                    serverPort = sub?.port ?: server.port
-                )
+    fun selectTarget(server: ServerInfo, sub: SubServerInfo?) {
+        selectedServer = server
+        selectedSubServer = sub
+        mainScreenViewModel.selectCaptureModeModel(
+            model.copy(
+                serverHostName = sub?.address ?: server.address,
+                serverPort = sub?.port ?: server.port
+            ).withAutoDetectedServerConfig()
+        )
+        coroutineScope.launch { snackbarHostState.showSnackbar("已选择 ${server.name}") }
+    }
+
+    Column(
+        modifier = modifier.padding(contentPadding),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        servers.forEach { server ->
+            ServerCard(
+                name = server.name,
+                iconRes = server.iconRes,
+                selected = selectedServer?.address == server.address,
+                onClick = {
+                    if (server.hasSubServers) {
+                        selectedServer = server
+                        showSubServers = true
+                    } else {
+                        selectTarget(server, null)
+                    }
+                }
             )
         }
 
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = {
-                        Text(
-                            "服务器",
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = WColors.OnSurface
-                        )
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = WColors.Background,
-                        titleContentColor = WColors.OnSurface
-                    )
-                )
-            },
-            floatingActionButton = {
-                FloatingActionButton(
-                    onClick = { showAddDialog = true },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                ) {
-                    Icon(Icons.Rounded.Add, contentDescription = "添加服务器")
+        if (customServers.isNotEmpty()) {
+            Text(
+                "自定义服务器",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+        customServers.forEach { custom ->
+            ServerCard(
+                name = custom.name,
+                iconRes = R.drawable.ic_web,
+                selected = selectedServer?.address == custom.address && selectedServer?.port == custom.port,
+                onClick = { selectTarget(ServerInfo(custom.name, R.drawable.ic_web, custom.address, custom.port), null) },
+                onDelete = {
+                    val updated = customServers.filterNot {
+                        it.address == custom.address && it.port == custom.port && it.name == custom.name
+                    }
+                    customServers = updated
+                    saveCustomServers(context, updated)
                 }
-            },
-            bottomBar = {
-                SnackbarHost(
-                    snackbarHostState,
-                    modifier = Modifier.animateContentSize()
-                )
-            },
-            containerColor = WColors.Background
-        ) { padding ->
-            Box {
+            )
+        }
+
+        TextButton(
+            onClick = { showAddDialog = true },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Rounded.Add, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("添加自定义服务器")
+        }
+    }
+
+    if (showSubServers && selectedServer?.hasSubServers == true) {
+        Dialog(onDismissRequest = { showSubServers = false }) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
                 Column(
-                    Modifier
-                        .padding(padding)
-                        .fillMaxSize()
+                    modifier = Modifier
+                        .padding(16.dp)
                         .verticalScroll(rememberScrollState())
-                        .padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
-                    servers.forEach { server ->
-                        ServerCard(
-                            name = server.name,
-                            iconRes = server.iconRes,
-                            selected = selectedServer == server,
-                            onClick = {
-                                if (server.hasSubServers) {
-                                    selectedServer = server
-                                    showSubServers = true
-                                } else {
-                                    selectTarget(server, null)
-                                }
-                            }
-                        )
-                    }
+                    Text(
+                        "选择地区与服务器",
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
 
-                    if (customServers.isNotEmpty()) {
+                    selectedServer?.subServers?.groupBy { it.region }?.forEach { (region, subServers) ->
                         Text(
-                            "自定义服务器",
+                            region,
                             style = MaterialTheme.typography.titleMedium,
-                            color = WColors.OnSurfaceVariant,
-                            modifier = Modifier.padding(top = 8.dp)
+                            modifier = Modifier.padding(vertical = 8.dp)
                         )
-                    }
-                    customServers.forEach { custom ->
-                        val info = ServerInfo(custom.name, R.drawable.ic_web, custom.address, custom.port)
-                        ServerCard(
-                            name = custom.name,
-                            iconRes = info.iconRes,
-                            selected = selectedServer?.address == custom.address && selectedServer?.port == custom.port,
-                            onClick = { selectTarget(info, null) },
-                            onDelete = {
-                                val updated = customServers.filterNot {
-                                    it.address == custom.address && it.port == custom.port && it.name == custom.name
-                                }
-                                customServers = updated
-                                saveCustomServers(context, updated)
-                            }
-                        )
-                    }
-                }
 
-                if (showSubServers && selectedServer?.hasSubServers == true) {
-                    Dialog(onDismissRequest = { showSubServers = false }) {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp)
-                        ) {
-                            Column(
+                        subServers.forEach { subServer ->
+                            Row(
                                 modifier = Modifier
-                                    .padding(16.dp)
-                                    .verticalScroll(rememberScrollState())
-                            ) {
-                                Text(
-                                    "选择地区与服务器",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    modifier = Modifier.padding(bottom = 16.dp)
-                                )
-
-                                selectedServer?.subServers?.groupBy { it.region }?.forEach { (region, subServers) ->
-                                    Text(
-                                        region,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        modifier = Modifier.padding(vertical = 8.dp)
-                                    )
-
-                                    subServers.forEach { subServer ->
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable {
-                                                    selectTarget(selectedServer!!, subServer)
-                                                    showSubServers = false
-                                                }
-                                                .padding(vertical = 4.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            RadioButton(
-                                                selected = selectedSubServer == subServer,
-                                                onClick = null
-                                            )
-                                            Text(
-                                                subServer.name,
-                                                modifier = Modifier.padding(start = 8.dp)
-                                            )
-                                        }
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        selectTarget(selectedServer!!, subServer)
+                                        showSubServers = false
                                     }
-                                }
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = selectedSubServer == subServer,
+                                    onClick = null
+                                )
+                                Text(
+                                    subServer.name,
+                                    modifier = Modifier.padding(start = 8.dp)
+                                )
                             }
                         }
                     }
                 }
             }
         }
+    }
 
-        if (showAddDialog) {
-            AddServerDialog(
-                onDismiss = { showAddDialog = false },
-                onSave = { name, address, port ->
-                    val updated = customServers + CustomServer(name, address, port)
-                    customServers = updated
-                    saveCustomServers(context, updated)
-                    showAddDialog = false
-                }
-            )
-        }
+    if (showAddDialog) {
+        AddServerDialog(
+            onDismiss = { showAddDialog = false },
+            onSave = { name, address, port ->
+                val updated = customServers + CustomServer(name, address, port)
+                customServers = updated
+                saveCustomServers(context, updated)
+                showAddDialog = false
+            }
+        )
     }
 }
 
@@ -295,24 +271,26 @@ private fun ServerCard(
                     Modifier.border(2.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.medium)
                 } else Modifier
             ),
-        shape = MaterialTheme.shapes.medium
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Row(
             modifier = Modifier
-                .padding(16.dp)
+                .padding(14.dp)
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Icon(
                 painter = painterResource(iconRes),
                 contentDescription = null,
-                modifier = Modifier.size(40.dp),
+                modifier = Modifier.size(36.dp),
                 tint = Color.Unspecified
             )
             Text(
                 text = name,
-                style = MaterialTheme.typography.titleMedium
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
             )
             if (onDelete != null) {
                 Spacer(Modifier.weight(1f))

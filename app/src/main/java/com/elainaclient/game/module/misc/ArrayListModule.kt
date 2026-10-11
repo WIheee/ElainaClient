@@ -91,6 +91,8 @@ class ArrayListModule : Module("arraylist", ModuleCategory.Misc) {
         }
     }
 
+    private var lastModules: List<ArrayListOverlay.ModuleInfo> = emptyList()
+
     private fun updateModuleList() {
         val enabledModules = ModuleManager.modules
             .filter { module ->
@@ -107,7 +109,12 @@ class ArrayListModule : Module("arraylist", ModuleCategory.Misc) {
                 )
             }
 
-        ArrayListOverlay.setModules(enabledModules)
+        // Push to the overlay only when the enabled set actually changed — it used to re-emit at
+        // 20 Hz and on every packet, forcing the HUD to recompose continuously.
+        if (enabledModules != lastModules) {
+            lastModules = enabledModules
+            ArrayListOverlay.setModules(enabledModules)
+        }
         updateSettings()
     }
 

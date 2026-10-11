@@ -4,7 +4,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.elainaclient.overlay.gui.classic.OverlayShortcutButton
-import com.elainaclient.util.translatedSelf
+import com.elainaclient.overlay.notify.NotificationType
+import com.elainaclient.overlay.notify.OverlayNotificationManager
 import com.elainaclient.util.SoundUtil
 import com.elainaclient.game.module.misc.ToggleSoundModule
 import kotlinx.serialization.json.*
@@ -118,12 +119,17 @@ abstract class Module(
     private fun sendToggleMessage(enabled: Boolean) {
         if (!isSessionCreated) return
 
-        val stateText = if (enabled) "enabled".translatedSelf else "disabled".translatedSelf
+        val stateText = if (enabled) "已启用" else "已禁用"
         val status = (if (enabled) "§a" else "§c") + stateText
-        val moduleName = name.translatedSelf
+        val moduleName = name.localizedModule()
 
         session.displayClientMessage(
             "§l§c[ElainaClient] §r§7$moduleName §8» $status"
+        )
+
+        OverlayNotificationManager.show(
+            "$moduleName $stateText",
+            if (enabled) NotificationType.SUCCESS else NotificationType.ERROR
         )
     }
 }

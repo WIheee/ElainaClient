@@ -153,7 +153,11 @@ class CrosshairOverlay : OverlayWindow() {
         var rainbowOffset by mutableFloatStateOf(0f)
         var pulseOffset by mutableFloatStateOf(0f)
 
-        LaunchedEffect(Unit) {
+        // Only tick while something actually animates (rainbow colour or pulse), so a static
+        // crosshair doesn't recompose every frame.
+        val animates = colorMode == CrosshairModule.ColorMode.RAINBOW || pulsing
+        LaunchedEffect(animates) {
+            if (!animates) return@LaunchedEffect
             while (true) {
                 rainbowOffset += rainbowSpeed * 0.02f
                 pulseOffset += pulseSpeed * 0.05f

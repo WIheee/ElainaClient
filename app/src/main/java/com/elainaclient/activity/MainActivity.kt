@@ -22,6 +22,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.elainaclient.game.ModuleManager
 import com.elainaclient.navigation.Navigation
+import com.elainaclient.ui.theme.AppTheme
 import com.elainaclient.ui.theme.ElainaClientTheme
 import com.elainaclient.util.SoundUtil
 
@@ -51,6 +52,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         SoundUtil.load(applicationContext)
 
+        AppTheme.load(this)
 
         ModuleManager.loadConfig()
 
@@ -61,7 +63,7 @@ class MainActivity : ComponentActivity() {
         requestStoragePermissions()
 
         setContent {
-            ElainaClientTheme {
+            ElainaClientTheme(darkTheme = AppTheme.isDark()) {
                 Navigation()
             }
         }

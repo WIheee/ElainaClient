@@ -1,12 +1,11 @@
 package com.elainaclient.ui.component
 
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -15,45 +14,38 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.elainaclient.ui.theme.WColors
 
 /**
- * Enhanced UI components with W aesthetics and liquid glass effects
+ * Glassy card/button components.
+ *
+ * The glow is a *static* shadow + border tint driven by [MaterialTheme.colorScheme] so the
+ * widgets follow the app's light/dark scheme. (Earlier revisions animated the glow alpha with an
+ * `rememberInfiniteTransition`, which forced a shadow re-render every frame — dropped for
+ * performance.)
  */
 
 @Composable
 fun WGlassCard(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(16.dp),
-    glowColor: Color = WColors.Primary,
+    glowColor: Color = MaterialTheme.colorScheme.primary,
     glowIntensity: Float = 0.3f,
     elevation: Dp = 8.dp,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "glow_animation")
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = glowIntensity * 0.5f,
-        targetValue = glowIntensity,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glow_alpha"
-    )
-
     val cardModifier = modifier
         .shadow(
             elevation = elevation,
             shape = shape,
-            ambientColor = glowColor.copy(alpha = glowAlpha),
-            spotColor = glowColor.copy(alpha = glowAlpha)
+            ambientColor = glowColor.copy(alpha = glowIntensity * 0.5f),
+            spotColor = glowColor.copy(alpha = glowIntensity * 0.5f)
         )
         .background(
             brush = Brush.linearGradient(
                 colors = listOf(
-                    WColors.Surface.copy(alpha = 0.9f),
-                    WColors.SurfaceVariant.copy(alpha = 0.7f)
+                    MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
                 )
             ),
             shape = shape
@@ -62,9 +54,9 @@ fun WGlassCard(
             width = 1.dp,
             brush = Brush.linearGradient(
                 colors = listOf(
-                    glowColor.copy(alpha = glowAlpha),
+                    glowColor.copy(alpha = glowIntensity * 0.6f),
                     Color.Transparent,
-                    glowColor.copy(alpha = glowAlpha * 0.5f)
+                    glowColor.copy(alpha = glowIntensity * 0.3f)
                 )
             ),
             shape = shape
@@ -76,9 +68,7 @@ fun WGlassCard(
             onClick = onClick,
             modifier = cardModifier,
             shape = shape,
-            colors = CardDefaults.cardColors(
-                containerColor = Color.Transparent
-            ),
+            colors = CardDefaults.cardColors(containerColor = Color.Transparent),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             content = content
         )
@@ -86,9 +76,7 @@ fun WGlassCard(
         Card(
             modifier = cardModifier,
             shape = shape,
-            colors = CardDefaults.cardColors(
-                containerColor = Color.Transparent
-            ),
+            colors = CardDefaults.cardColors(containerColor = Color.Transparent),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             content = content
         )
@@ -101,10 +89,10 @@ fun WButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     colors: ButtonColors = ButtonDefaults.buttonColors(
-        containerColor = WColors.Primary,
-        contentColor = WColors.OnPrimary,
-        disabledContainerColor = WColors.SurfaceVariant,
-        disabledContentColor = WColors.OnSurfaceVariant
+        containerColor = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
+        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
     ),
     elevation: ButtonElevation? = ButtonDefaults.buttonElevation(
         defaultElevation = 6.dp,
@@ -115,26 +103,14 @@ fun WButton(
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     content: @Composable RowScope.() -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "button_glow")
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.2f,
-        targetValue = 0.4f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glow_alpha"
-    )
-
     Button(
         onClick = onClick,
-        modifier = modifier
-            .shadow(
-                elevation = 8.dp,
-                shape = shape,
-                ambientColor = WColors.Primary.copy(alpha = if (enabled) glowAlpha else 0f),
-                spotColor = WColors.Primary.copy(alpha = if (enabled) glowAlpha else 0f)
-            ),
+        modifier = modifier.shadow(
+            elevation = 6.dp,
+            shape = shape,
+            ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 0.35f else 0f),
+            spotColor = MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 0.35f else 0f)
+        ),
         enabled = enabled,
         shape = shape,
         colors = colors,
@@ -149,34 +125,17 @@ fun WFloatingActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(16.dp),
-    containerColor: Color = WColors.Primary,
-    contentColor: Color = WColors.OnPrimary,
+    containerColor: Color = MaterialTheme.colorScheme.primary,
+    contentColor: Color = MaterialTheme.colorScheme.onPrimary,
     elevation: FloatingActionButtonElevation = FloatingActionButtonDefaults.elevation(
         defaultElevation = 8.dp,
         pressedElevation = 4.dp
     ),
     content: @Composable () -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "fab_glow")
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 0.6f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glow_alpha"
-    )
-
     FloatingActionButton(
         onClick = onClick,
-        modifier = modifier
-            .shadow(
-                elevation = 12.dp,
-                shape = shape,
-                ambientColor = containerColor.copy(alpha = glowAlpha),
-                spotColor = containerColor.copy(alpha = glowAlpha)
-            ),
+        modifier = modifier,
         shape = shape,
         containerColor = containerColor,
         contentColor = contentColor,

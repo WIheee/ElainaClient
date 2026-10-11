@@ -8,9 +8,10 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.elainaclient.game.AccountManager
-import com.elainaclient.game.RealmsAuthFlow
 import net.raphimc.minecraftauth.MinecraftAuth
 import net.raphimc.minecraftauth.bedrock.BedrockAuthManager
+import net.raphimc.minecraftauth.msa.data.MsaConstants
+import net.raphimc.minecraftauth.msa.model.MsaApplicationConfig
 import net.raphimc.minecraftauth.msa.service.impl.DeviceCodeMsaAuthService
 import java.util.function.Consumer
 import kotlin.concurrent.thread
@@ -18,6 +19,11 @@ import kotlin.concurrent.thread
 val auth = "UCxb4pcHvdYpqv7i5Xt9mOUw"
 
 val authId = "$auth"
+
+// Bedrock Android title ID + the "title auth" scope. Using a "title" client ID is what lets
+// BedrockAuthManager fetch additional scopes on demand instead of building them up front.
+private val BEDROCK_ANDROID_APPLICATION_CONFIG: MsaApplicationConfig =
+    MsaApplicationConfig(MsaConstants.BEDROCK_ANDROID_TITLE_ID, MsaConstants.SCOPE_TITLE_AUTH)
 
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -40,10 +46,8 @@ class AuthWebView @JvmOverloads constructor(
             runCatching {
                 val httpClient = MinecraftAuth.createHttpClient()
 
-                // Unlike the old 4.x step-chain API, BedrockAuthManager fetches tokens lazily
-                // and per-purpose (Realms XSTS is only requested later, if/when RealmsManager
-                // actually needs it) - so there's no separate "Realms-capable chain that can
-                // fail for accounts without Realms" to fall back from anymore.
+                // BedrockAuthManager fetches tokens lazily and per-purpose; a "title" client ID
+                // is what lets it fetch additional scopes on demand rather than up front.
                 //
                 // NOTE: we build the DeviceCodeMsaAuthService ourselves (instead of passing
                 // `::DeviceCodeMsaAuthService` into `.login(supplier, callback)`) because
@@ -60,14 +64,14 @@ class AuthWebView @JvmOverloads constructor(
                 }
                 val authService = DeviceCodeMsaAuthService(
                     httpClient,
-                    RealmsAuthFlow.BEDROCK_ANDROID_APPLICATION_CONFIG,
+                    BEDROCK_ANDROID_APPLICATION_CONFIG,
                     deviceCodeCallback
                 )
                 val msaToken = authService.acquireToken()
 
                 val authManager = BedrockAuthManager
                     .create(httpClient, AccountManager.GAME_VERSION)
-                    .msaApplicationConfig(RealmsAuthFlow.BEDROCK_ANDROID_APPLICATION_CONFIG)
+                    .msaApplicationConfig(BEDROCK_ANDROID_APPLICATION_CONFIG)
                     .login(msaToken)
 
                 AccountManager.addAccount(authManager)

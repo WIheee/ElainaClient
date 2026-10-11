@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.elainaclient.game.LocalClickGuiStyle
 import com.elainaclient.game.ModuleManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -25,11 +26,16 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 
-private val CardBackgroundExpanded = Color(0xFF1A1212)
-private val AccentPrimary = Color(0xFFE63946)
-private val TextPrimary = Color(0xFFE8E8E8)
-private val TextTertiary = Color(0xFF888888)
-private val ButtonBackground = Color(0xFF251A1A)
+private val CardBackgroundExpanded: Color
+    @Composable get() = LocalClickGuiStyle.current.cardBackgroundExpanded
+private val AccentPrimary: Color
+    @Composable get() = LocalClickGuiStyle.current.accent
+private val TextPrimary: Color
+    @Composable get() = LocalClickGuiStyle.current.textPrimary
+private val TextTertiary: Color
+    @Composable get() = LocalClickGuiStyle.current.textMuted
+private val ButtonBackground: Color
+    @Composable get() = LocalClickGuiStyle.current.buttonBackground
 
 @Composable
 fun ConfigurationScreen(
@@ -45,11 +51,11 @@ fun ConfigurationScreen(
         uri?.let {
             if (ModuleManager.importConfigFromFile(context, it)) {
                 coroutineScope.launch {
-                    snackbarHostState.showSnackbar("✅ Config imported successfully")
+                    snackbarHostState.showSnackbar("✅ 配置导入成功")
                 }
             } else {
                 coroutineScope.launch {
-                    snackbarHostState.showSnackbar("❌ Failed to import config")
+                    snackbarHostState.showSnackbar("❌ 导入配置失败")
                 }
             }
         }
@@ -70,9 +76,9 @@ fun ConfigurationScreen(
                         if (success) {
                             val configsDir = ModuleManager.getElainaClientConfigsDirectory()
                             val path = configsDir?.let { File(it, fileName).absolutePath } ?: "ElainaClient/configs/$fileName"
-                            snackbarHostState.showSnackbar("✅ Exported to: $path")
+                            snackbarHostState.showSnackbar("✅ 已导出到：$path")
                         } else {
-                            snackbarHostState.showSnackbar("❌ Failed to export config")
+                            snackbarHostState.showSnackbar("❌ 导出配置失败")
                         }
                     }
                 }
@@ -85,13 +91,13 @@ fun ConfigurationScreen(
 private fun ConfigurationHeader() {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
-            text = "Configuration",
+            text = "配置管理",
             color = TextPrimary,
             fontSize = 20.sp,
             fontWeight = FontWeight.SemiBold
         )
         Text(
-            text = "Manage your configurations with ease",
+            text = "轻松管理你的配置",
             color = TextTertiary,
             fontSize = 13.sp
         )
@@ -114,13 +120,13 @@ private fun ConfigurationActions(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             ConfigActionButton(
-                text = "Import Config",
+                text = "导入配置",
                 icon = Icons.Rounded.Upload,
                 onClick = onImportClick
             )
 
             ConfigActionButton(
-                text = "Export Config",
+                text = "导出配置",
                 icon = Icons.Rounded.SaveAlt,
                 onClick = onExportClick
             )

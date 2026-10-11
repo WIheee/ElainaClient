@@ -2,34 +2,34 @@ package com.elainaclient.router.main
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.os.Build
-import android.provider.OpenableColumns
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import android.content.ClipData
-import android.content.ClipboardManager
-import androidx.core.content.getSystemService
-import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -37,44 +37,45 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.rounded.AddPhotoAlternate
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.rounded.AccountCircle
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Extension
-import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Security
-import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Speed
-import androidx.compose.material.icons.rounded.Upload
-import androidx.compose.material.icons.rounded.Whatshot
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.BasicAlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -83,18 +84,17 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
+import androidx.core.content.getSystemService
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
@@ -102,10 +102,9 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.elainaclient.R
+import com.elainaclient.game.AccountManager
+import com.elainaclient.model.CaptureModeModel
 import com.elainaclient.service.Services
-import com.elainaclient.ui.component.WButton
-import com.elainaclient.ui.component.WFloatingActionButton
-import com.elainaclient.ui.component.WGlassCard
 import com.elainaclient.ui.theme.WColors
 import com.elainaclient.util.LocalSnackbarHostState
 import com.elainaclient.util.MinecraftUtils
@@ -113,10 +112,13 @@ import com.elainaclient.util.ServerCompatUtils
 import com.elainaclient.util.SnackbarHostStateScope
 import com.elainaclient.viewmodel.MainScreenViewModel
 import kotlinx.coroutines.launch
-import java.io.File
 import java.net.Inet4Address
 import java.net.NetworkInterface
 
+/**
+ * Home dashboard, ported from LuminaCN-2.1.0's `NewHomeScreen` (the server-verification
+ * "ad gate" and its notice/privacy/update dialogs were intentionally dropped).
+ */
 @SuppressLint("StateFlowValueCalledInComposition")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -125,24 +127,29 @@ fun HomePageContent() {
         val context = LocalContext.current
         val coroutineScope = rememberCoroutineScope()
         val snackbarHostState = LocalSnackbarHostState.current
-        val mainScreenViewModel: MainScreenViewModel = viewModel()
+        val vm: MainScreenViewModel = viewModel()
+        val model by vm.captureModeModel.collectAsStateWithLifecycle()
+        val selectedGame by vm.selectedGame.collectAsStateWithLifecycle()
+
+        var isActiveBefore by rememberSaveable { mutableStateOf(Services.isActive) }
+        var showConnectionDialog by remember { mutableStateOf(false) }
 
         val onPostPermissionResult: (Boolean) -> Unit = block@{ isGranted ->
             if (!isGranted) {
                 coroutineScope.launch {
                     snackbarHostState.currentSnackbarData?.dismiss()
-                    snackbarHostState.showSnackbar(message = context.getString(R.string.notification_permission_denied))
+                    snackbarHostState.showSnackbar(context.getString(R.string.notification_permission_denied))
                 }
                 return@block
             }
-            if (mainScreenViewModel.selectedGame.value === null) {
+            if (selectedGame == null) {
                 coroutineScope.launch {
                     snackbarHostState.currentSnackbarData?.dismiss()
-                    snackbarHostState.showSnackbar(message = context.getString(R.string.select_game_first))
+                    snackbarHostState.showSnackbar(context.getString(R.string.select_game_first))
                 }
                 return@block
             }
-            Services.toggle(context, mainScreenViewModel.captureModeModel.value)
+            Services.toggle(context, vm.captureModeModel.value)
         }
 
         val postNotificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -155,7 +162,7 @@ fun HomePageContent() {
             if (!Settings.canDrawOverlays(context)) {
                 coroutineScope.launch {
                     snackbarHostState.currentSnackbarData?.dismiss()
-                    snackbarHostState.showSnackbar(message = context.getString(R.string.overlay_permission_denied))
+                    snackbarHostState.showSnackbar(context.getString(R.string.overlay_permission_denied))
                 }
                 return@rememberLauncherForActivityResult
             }
@@ -166,29 +173,29 @@ fun HomePageContent() {
             onPostPermissionResult(true)
         }
 
-        var isActiveBefore by rememberSaveable { mutableStateOf(Services.isActive) }
-        var showConnectionDialog by remember { mutableStateOf(false) }
+        val requestStart: () -> Unit = {
+            if (!Settings.canDrawOverlays(context)) {
+                Toast.makeText(context, R.string.request_overlay_permission, Toast.LENGTH_SHORT).show()
+                overlayPermissionLauncher.launch(
+                    Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, "package:${context.packageName}".toUri())
+                )
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                postNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                onPostPermissionResult(true)
+            }
+        }
 
         LaunchedEffect(Services.isActive) {
             if (Services.isActive == isActiveBefore) return@LaunchedEffect
             isActiveBefore = Services.isActive
+            snackbarHostState.currentSnackbarData?.dismiss()
             if (Services.isActive) {
                 showConnectionDialog = true
-                snackbarHostState.currentSnackbarData?.dismiss()
-                val result = snackbarHostState.showSnackbar(
-                    message = context.getString(R.string.backend_connected),
-                    actionLabel = context.getString(R.string.start_game)
-                )
-                val selectedGame = mainScreenViewModel.selectedGame.value
-                if (result == SnackbarResult.ActionPerformed && selectedGame != null) {
-                    val intent = context.packageManager.getLaunchIntentForPackage(selectedGame)
-                    if (intent != null) context.startActivity(intent)
-                    else snackbarHostState.showSnackbar(message = context.getString(R.string.failed_to_launch_game))
-                }
-                return@LaunchedEffect
+                snackbarHostState.showSnackbar(context.getString(R.string.backend_connected))
+            } else {
+                snackbarHostState.showSnackbar(context.getString(R.string.backend_disconnected))
             }
-            snackbarHostState.currentSnackbarData?.dismiss()
-            snackbarHostState.showSnackbar(message = context.getString(R.string.backend_disconnected))
         }
 
         Scaffold(
@@ -196,281 +203,197 @@ fun HomePageContent() {
                 TopAppBar(
                     title = {
                         Text(
-                            "主页",
+                            stringResource(R.string.home),
                             style = MaterialTheme.typography.headlineMedium,
-                            color = WColors.OnSurface
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = WColors.Background,
-                        titleContentColor = WColors.OnSurface
+                        containerColor = MaterialTheme.colorScheme.background,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
                     )
                 )
             },
-            bottomBar = {
-                SnackbarHost(
-                    snackbarHostState,
-                    modifier = Modifier.animateContentSize()
-                )
-            },
-            containerColor = WColors.Background
-        ) { padding ->
-            Box(Modifier.padding(padding).fillMaxSize()) {
-                Column(
-                    Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
-                ) {
-                    WelcomeCard()
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(IntrinsicSize.Max),
-                        horizontalArrangement = Arrangement.spacedBy(20.dp)
-                    ) {
-
-                        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                            GameCard()
-                        }
-                    }
-                    TexturePackCard()
-                }
-                WFloatingActionButton(
+            floatingActionButton = {
+                ExtendedFloatingActionButton(
                     onClick = {
-                        if (!Settings.canDrawOverlays(context)) {
-                            Toast.makeText(context, R.string.request_overlay_permission, Toast.LENGTH_SHORT).show()
-                            overlayPermissionLauncher.launch(
-                                Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, "package: ${context.packageName}".toUri())
-                            )
-                            return@WFloatingActionButton
+                        if (!Services.isActive) {
+                            coroutineScope.launch {
+                                val result = snackbarHostState.showSnackbar(
+                                    message = "服务正在启动...",
+                                    actionLabel = "启动应用",
+                                    duration = SnackbarDuration.Long
+                                )
+                                if (result == SnackbarResult.ActionPerformed) {
+                                    val intent = selectedGame?.let { context.packageManager.getLaunchIntentForPackage(it) }
+                                    if (intent != null) context.startActivity(intent)
+                                    else snackbarHostState.showSnackbar("未安装选定的游戏，请先选择游戏")
+                                }
+                            }
                         }
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            postNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                            return@WFloatingActionButton
-                        }
-                        onPostPermissionResult(true)
+                        requestStart()
                     },
-                    modifier = Modifier.padding(15.dp).align(Alignment.BottomEnd),
                     containerColor = if (Services.isActive) WColors.Error else WColors.Primary,
-                    contentColor = WColors.OnPrimary
+                    contentColor = WColors.OnPrimary,
+                    shape = RoundedCornerShape(16.dp)
                 ) {
-                    AnimatedContent(Services.isActive, label = "") { isActive ->
-                        if (!isActive) Icon(Icons.Rounded.PlayArrow, contentDescription = null)
-                        else Icon(Icons.Rounded.Pause, contentDescription = null)
-                    }
+                    Icon(
+                        if (Services.isActive) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        contentDescription = null
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = if (Services.isActive) "停止服务" else "启动服务",
+                        style = MaterialTheme.typography.labelLarge
+                    )
                 }
+            },
+            bottomBar = {
+                SnackbarHost(snackbarHostState, modifier = Modifier.animateContentSize())
+            },
+            containerColor = MaterialTheme.colorScheme.background
+        ) { padding ->
+            Column(
+                Modifier
+                    .padding(padding)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                AccountCard()
+                GameCard()
+                ServerConfigCard(vm, model, snackbarHostState)
+                ServerListCard()
+                ServiceStatusCard()
             }
         }
 
-
         if (showConnectionDialog) {
-            val ipAddress = remember {
-                runCatching {
-                    NetworkInterface.getNetworkInterfaces().asSequence()
-                        .flatMap { it.inetAddresses.asSequence() }
-                        .filterIsInstance<Inet4Address>()
-                        .firstOrNull { !it.isLoopbackAddress }
-                        ?.hostAddress
-                }.getOrNull() ?: "127.0.0.1"
-            }
-
-            AlertDialog(
-                onDismissRequest = { showConnectionDialog = false },
-                title = { Text("中继已连接", style = MaterialTheme.typography.titleLarge) },
-                text = {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 400.dp)
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        val currentModel = mainScreenViewModel.captureModeModel.value
-                        if (currentModel.isProtectedServer()) {
-                            Card(
-                                colors = CardDefaults.cardColors(containerColor = WColors.Primary.copy(alpha = 0.1f))
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text("Aternos 服务器", style = MaterialTheme.typography.titleSmall, color = WColors.Primary, fontWeight = FontWeight.Bold)
-                                    Text("主机：${currentModel.serverHostName}", style = MaterialTheme.typography.bodySmall)
-                                    Text(ServerCompatUtils.getStatusMessage(currentModel.serverConfigType), style = MaterialTheme.typography.bodySmall, color = WColors.OnSurfaceVariant)
-                                }
-                            }
-                        }
-
-                        Text("打开 Minecraft → 好友 → 通过局域网加入；若未出现，用此 IP 和端口手动添加服务器。", style = MaterialTheme.typography.bodyMedium)
-
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text("IP", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), modifier = Modifier.weight(1f))
-                                    Row(
-                                        modifier = Modifier.weight(2f),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(ipAddress, style = MaterialTheme.typography.bodyLarge)
-                                        androidx.compose.material3.IconButton(
-                                            onClick = {
-                                                val clipboard = context.getSystemService<ClipboardManager>()
-                                                val clip = ClipData.newPlainText("IP 地址", ipAddress)
-                                                clipboard?.setPrimaryClip(clip)
-                                                coroutineScope.launch {
-                                                    snackbarHostState.showSnackbar("IP 已复制到剪贴板")
-                                                }
-                                            }
-                                        ) {
-                                            Icon(
-                                                Icons.Rounded.ContentCopy,
-                                                contentDescription = "复制 IP",
-                                                modifier = Modifier.size(18.dp),
-                                                tint = WColors.Primary
-                                            )
-                                        }
-                                    }
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text("Port", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), modifier = Modifier.weight(1f))
-                                    Row(
-                                        modifier = Modifier.weight(2f),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text("19132", style = MaterialTheme.typography.bodyLarge)
-                                        androidx.compose.material3.IconButton(
-                                            onClick = {
-                                                val clipboard = context.getSystemService<ClipboardManager>()
-                                                val clip = ClipData.newPlainText("Port", "19132")
-                                                clipboard?.setPrimaryClip(clip)
-                                                coroutineScope.launch {
-                                                    snackbarHostState.showSnackbar("端口已复制到剪贴板")
-                                                }
-                                            }
-                                        ) {
-                                            Icon(
-                                                Icons.Rounded.ContentCopy,
-                                                contentDescription = "复制端口",
-                                                modifier = Modifier.size(18.dp),
-                                                tint = WColors.Primary
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        if (currentModel.isProtectedServer()) {
-                            Card(colors = CardDefaults.cardColors(containerColor = WColors.Secondary.copy(alpha = 0.1f))) {
-                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Text("Tips", style = MaterialTheme.typography.titleSmall, color = WColors.Secondary, fontWeight = FontWeight.Bold)
-                                    ServerCompatUtils.getTroubleshootingTips().take(3).forEach {
-                                        Text(it, style = MaterialTheme.typography.bodySmall, color = WColors.OnSurfaceVariant)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                confirmButton = { TextButton(onClick = { showConnectionDialog = false }) { Text("确定") } }
-            )
+            ConnectionDialog(model) { showConnectionDialog = false }
         }
     }
 }
 
 @Composable
-private fun WelcomeCard() {
-    WGlassCard(
+private fun AccountCard() {
+    val account = AccountManager.selectedAccount ?: return
+    Card(
         modifier = Modifier.fillMaxWidth(),
-        glowColor = WColors.Primary,
-        glowIntensity = 0.25f
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(
+                modifier = Modifier.size(48.dp),
+                shape = CircleShape,
+                color = WColors.Primary.copy(alpha = 0.12f)
+            ) {
                 Icon(
-                    Icons.Rounded.Whatshot,
+                    Icons.Rounded.AccountCircle,
                     contentDescription = null,
-                    tint = WColors.Primary,
                     modifier = Modifier
-                        .background(WColors.Primary.copy(alpha = 0.2f), CircleShape)
-                        .padding(10.dp)
-                        .size(28.dp)
+                        .padding(8.dp)
+                        .size(32.dp),
+                    tint = WColors.Primary
                 )
-                Column {
-                    Text("ElainaClient", style = MaterialTheme.typography.headlineMedium, color = WColors.OnSurface)
-                    Text("更顺滑的基岩版体验。", style = MaterialTheme.typography.bodyLarge, color = WColors.Primary)
-                }
+            }
+            Column {
+                Text("当前账户", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(account.displayName, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
             }
         }
     }
 }
 
-
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun GameCard() {
     val context = LocalContext.current
-    val mainScreenViewModel: MainScreenViewModel = viewModel()
-    val captureModeModel by mainScreenViewModel.captureModeModel.collectAsStateWithLifecycle()
-    var showGameSettingsDialog by rememberSaveable { mutableStateOf(false) }
-    var serverHostName by rememberSaveable(showGameSettingsDialog) { mutableStateOf(captureModeModel.serverHostName) }
-    var serverPort by rememberSaveable(showGameSettingsDialog) { mutableStateOf(captureModeModel.serverPort.toString()) }
-    var showGameSelectorDialog by remember { mutableStateOf(false) }
-    val packageInfos by mainScreenViewModel.packageInfos.collectAsStateWithLifecycle()
-    val packageInfoState by mainScreenViewModel.packageInfoState.collectAsStateWithLifecycle()
-    val selectedGame by mainScreenViewModel.selectedGame.collectAsStateWithLifecycle()
+    val vm: MainScreenViewModel = viewModel()
+    val selectedGame by vm.selectedGame.collectAsStateWithLifecycle()
+    val packageInfos by vm.packageInfos.collectAsStateWithLifecycle()
+    val packageInfoState by vm.packageInfoState.collectAsStateWithLifecycle()
+    var showSelector by remember { mutableStateOf(false) }
 
-    WGlassCard(
-        modifier = Modifier.fillMaxWidth().fillMaxHeight(),
-        glowColor = WColors.Accent,
-        glowIntensity = 0.22f,
-        onClick = { showGameSettingsDialog = true }
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { showSelector = true },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(
-            modifier = Modifier.padding(20.dp).fillMaxHeight(),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(
+                modifier = Modifier.size(48.dp),
+                shape = CircleShape,
+                color = WColors.Primary.copy(alpha = 0.12f)
+            ) {
                 Icon(
-                    painter = painterResource(R.mipmap.minecraft_icon),
+                    Icons.Rounded.Extension,
                     contentDescription = null,
-                    tint = Color.Unspecified,
-                    modifier = Modifier.size(32.dp).clip(CircleShape)
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .size(32.dp),
+                    tint = WColors.Primary
                 )
-                Column(Modifier.weight(1f)) {
-                    Text("Minecraft", style = MaterialTheme.typography.titleMedium, color = WColors.OnSurface)
-                    Text("支持：${MinecraftUtils.RECOMMENDED_VERSION}", style = MaterialTheme.typography.bodySmall, color = WColors.OnSurfaceVariant)
-                }
-                Icon(Icons.Rounded.Settings, contentDescription = null, tint = WColors.Accent, modifier = Modifier.size(22.dp))
             }
-
-
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = selectedGame ?: "未选择游戏",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "点击选择要启动的游戏 · 支持 ${MinecraftUtils.RECOMMENDED_VERSION}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Surface(
+                modifier = Modifier.size(32.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceVariant
+            ) {
+                Icon(
+                    Icons.Filled.ExpandMore,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .padding(4.dp)
+                        .size(24.dp)
+                        .rotate(270f),
+                    tint = WColors.Primary
+                )
+            }
         }
     }
 
-    if (showGameSelectorDialog) {
-        LifecycleEventEffect(Lifecycle.Event.ON_START) { mainScreenViewModel.fetchPackageInfos() }
+    if (showSelector) {
+        LifecycleEventEffect(Lifecycle.Event.ON_START) { vm.fetchPackageInfos() }
 
         BasicAlertDialog(
-            onDismissRequest = { showGameSelectorDialog = false },
+            onDismissRequest = { showSelector = false },
             modifier = Modifier.padding(vertical = 24.dp),
             content = {
                 Surface(shape = AlertDialogDefaults.shape, tonalElevation = AlertDialogDefaults.TonalElevation) {
                     Column(
-                        Modifier.padding(24.dp).fillMaxWidth(),
+                        Modifier
+                            .padding(24.dp)
+                            .fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
@@ -482,7 +405,11 @@ private fun GameCard() {
                         ) {
                             item {
                                 if (packageInfoState === MainScreenViewModel.PackageInfoState.Loading) {
-                                    LinearProgressIndicator(modifier = Modifier.padding(vertical = 12.dp).fillMaxWidth())
+                                    LinearProgressIndicator(
+                                        modifier = Modifier
+                                            .padding(vertical = 12.dp)
+                                            .fillMaxWidth()
+                                    )
                                 }
                             }
                             items(packageInfos.size) { index ->
@@ -493,10 +420,13 @@ private fun GameCard() {
                                 val name = remember { applicationInfo.loadLabel(pm).toString() }
                                 val packageName = packageInfo.packageName
                                 val versionName = packageInfo.versionName ?: "0.0.0"
-                                Card(onClick = {
-                                    mainScreenViewModel.selectGame(packageName)
-                                    showGameSelectorDialog = false
-                                }, shape = MaterialTheme.shapes.medium) {
+                                Card(
+                                    onClick = {
+                                        vm.selectGame(packageName)
+                                        showSelector = false
+                                    },
+                                    shape = MaterialTheme.shapes.medium
+                                ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -517,211 +447,293 @@ private fun GameCard() {
             }
         )
     }
+}
 
-    if (showGameSettingsDialog) {
-        BasicAlertDialog(
-            onDismissRequest = { showGameSettingsDialog = false },
-            modifier = Modifier.padding(vertical = 24.dp),
-            content = {
-                Surface(shape = AlertDialogDefaults.shape, tonalElevation = AlertDialogDefaults.TonalElevation) {
-                    Column(
-                        Modifier.padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+@Composable
+private fun ServerConfigCard(
+    vm: MainScreenViewModel,
+    model: CaptureModeModel,
+    snackbarHostState: androidx.compose.material3.SnackbarHostState
+) {
+    val coroutineScope = rememberCoroutineScope()
+    var ip by remember(model.serverHostName) { mutableStateOf(model.serverHostName) }
+    var port by remember(model.serverPort) { mutableStateOf(model.serverPort.toString()) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("服务器配置", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+
+            OutlinedTextField(
+                value = ip,
+                onValueChange = { ip = it },
+                label = { Text("服务器地址") },
+                singleLine = true,
+                enabled = !Services.isActive,
+                modifier = Modifier.fillMaxWidth()
+            )
+            OutlinedTextField(
+                value = port,
+                onValueChange = { port = it.filter { ch -> ch.isDigit() } },
+                label = { Text("服务器端口") },
+                singleLine = true,
+                enabled = !Services.isActive,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Button(
+                onClick = {
+                    val p = port.toIntOrNull()
+                    if (ip.isBlank() || p == null || p !in 0..65535) {
+                        coroutineScope.launch { snackbarHostState.showSnackbar("服务器地址或端口无效") }
+                        return@Button
+                    }
+                    vm.selectCaptureModeModel(
+                        model.copy(serverHostName = ip.trim(), serverPort = p).withAutoDetectedServerConfig()
+                    )
+                    coroutineScope.launch { snackbarHostState.showSnackbar("服务器配置已保存") }
+                },
+                enabled = !Services.isActive,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = WColors.Primary, contentColor = WColors.OnPrimary)
+            ) { Text("保存配置") }
+
+            if (Services.isActive) {
+                Text(
+                    "修改服务器设置前请先停止中继。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ServerListCard() {
+    var expanded by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
+            Modifier.animateContentSize(
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
+            )
+        ) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded }
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Surface(
+                        modifier = Modifier.size(40.dp),
+                        shape = CircleShape,
+                        color = WColors.Primary.copy(alpha = 0.12f)
                     ) {
-                        Text("游戏设置", modifier = Modifier.align(Alignment.Start), style = MaterialTheme.typography.headlineSmall)
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(14.dp),
-                            modifier = Modifier.verticalScroll(rememberScrollState())
-                        ) {
-                            val interactionSource = remember { MutableInteractionSource() }
-                            val isPressed by interactionSource.collectIsPressedAsState()
-                            if (isPressed) SideEffect { showGameSelectorDialog = true }
+                        Icon(
+                            Icons.Filled.Storage,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .padding(8.dp)
+                                .size(24.dp),
+                            tint = WColors.Primary
+                        )
+                    }
+                    Column {
+                        Text("服务器列表", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                        Text(
+                            if (expanded) "点击收起列表" else "点击展开选择服务器",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Surface(modifier = Modifier.size(32.dp), shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant) {
+                    val rotation by animateFloatAsState(
+                        targetValue = if (expanded) 180f else 0f,
+                        animationSpec = tween(300),
+                        label = "chevron_rotation"
+                    )
+                    Icon(
+                        Icons.Filled.ExpandMore,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .padding(4.dp)
+                            .size(24.dp)
+                            .rotate(rotation),
+                        tint = WColors.Primary
+                    )
+                }
+            }
 
-                            TextField(
-                                value = selectedGame ?: "",
-                                onValueChange = {},
-                                readOnly = true,
-                                maxLines = 1,
-                                label = { Text("选择游戏") },
-                                placeholder = { Text("未选择游戏") },
-                                interactionSource = interactionSource,
-                                enabled = !Services.isActive
-                            )
-                            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                                TextField(
-                                    value = serverHostName,
-                                    label = { Text("服务器地址") },
-                                    onValueChange = {
-                                        serverHostName = it
-                                        if (it.isEmpty()) return@TextField
-                                        val updated = captureModeModel.copy(serverHostName = it).withAutoDetectedServerConfig()
-                                        mainScreenViewModel.selectCaptureModeModel(updated)
-                                    },
-                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                                    singleLine = true,
-                                    enabled = !Services.isActive
-                                )
-                                TextField(
-                                    value = serverPort,
-                                    label = { Text("服务器端口") },
-                                    onValueChange = {
-                                        serverPort = it
-                                        if (it.isEmpty()) return@TextField
-                                        val port = it.toIntOrNull() ?: return@TextField
-                                        if (port in 0..65535) {
-                                            mainScreenViewModel.selectCaptureModeModel(captureModeModel.copy(serverPort = port))
-                                        }
-                                    },
-                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                                    singleLine = true,
-                                    enabled = !Services.isActive
-                                )
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically(
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
+                ) + fadeIn(),
+                exit = shrinkVertically(
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
+                ) + fadeOut()
+            ) {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    HorizontalDivider(
+                        thickness = 1.dp,
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                    ServerListContent(contentPadding = PaddingValues(vertical = 4.dp))
+                    Spacer(Modifier.size(8.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ServiceStatusCard() {
+    val active = Services.isActive
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (active) MaterialTheme.colorScheme.tertiaryContainer
+            else MaterialTheme.colorScheme.errorContainer
+        )
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .animateContentSize(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            val iconScale by animateFloatAsState(if (active) 1.2f else 1f, label = "status_scale")
+            Icon(
+                if (active) Icons.Filled.Check else Icons.Filled.Stop,
+                contentDescription = null,
+                tint = if (active) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.scale(iconScale)
+            )
+            Column {
+                Text("服务状态", style = MaterialTheme.typography.bodySmall)
+                Text(
+                    if (active) "运行中" else "已停止",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConnectionDialog(model: CaptureModeModel, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = LocalSnackbarHostState.current
+
+    val ipAddress = remember {
+        runCatching {
+            NetworkInterface.getNetworkInterfaces().asSequence()
+                .flatMap { it.inetAddresses.asSequence() }
+                .filterIsInstance<Inet4Address>()
+                .firstOrNull { !it.isLoopbackAddress }
+                ?.hostAddress
+        }.getOrNull() ?: "127.0.0.1"
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("中继已连接", style = MaterialTheme.typography.titleLarge) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 400.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    "打开 Minecraft → 好友 → 通过局域网加入；若未出现，用此 IP 和端口手动添加服务器。",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                ) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        ConnectionRow(
+                            label = "IP",
+                            value = ipAddress,
+                            onCopy = {
+                                context.getSystemService<ClipboardManager>()?.setPrimaryClip(ClipData.newPlainText("IP 地址", ipAddress))
+                                coroutineScope.launch { snackbarHostState.showSnackbar("IP 已复制到剪贴板") }
                             }
-
-                            if (ServerCompatUtils.isProtectedServer(serverHostName) && !Services.isActive) {
-                                Card(
-                                    modifier = Modifier.width(TextFieldDefaults.MinWidth),
-                                    shape = MaterialTheme.shapes.medium,
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = WColors.Primary.copy(alpha = 0.1f),
-                                        contentColor = WColors.Primary
-                                    )
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Icon(Icons.Outlined.Info, contentDescription = null, modifier = Modifier.size(18.dp), tint = WColors.Primary)
-                                            Text("检测到 Aternos", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                                        }
-                                        val info = ServerCompatUtils.extractServerInfo(serverHostName)
-                                        if (info != null) Text("服务器：${info.serverId}", style = MaterialTheme.typography.bodySmall)
-                                        Text(ServerCompatUtils.getStatusMessage(captureModeModel.serverConfigType), style = MaterialTheme.typography.bodySmall)
-                                        Text(ServerCompatUtils.getConfigDescription(captureModeModel.serverConfigType), style = MaterialTheme.typography.bodySmall, color = WColors.OnSurfaceVariant)
-                                    }
-                                }
+                        )
+                        ConnectionRow(
+                            label = "Port",
+                            value = "19132",
+                            onCopy = {
+                                context.getSystemService<ClipboardManager>()?.setPrimaryClip(ClipData.newPlainText("Port", "19132"))
+                                coroutineScope.launch { snackbarHostState.showSnackbar("端口已复制到剪贴板") }
                             }
+                        )
+                    }
+                }
 
-                            if (Services.isActive) {
-                                Card(
-                                    modifier = Modifier.width(TextFieldDefaults.MinWidth),
-                                    shape = MaterialTheme.shapes.medium,
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                                    )
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                        Icon(Icons.Outlined.Info, contentDescription = null, modifier = Modifier.size(18.dp))
-                                        Column {
-                                            Text("注意", style = MaterialTheme.typography.bodyLarge)
-                                            Text("修改这些设置前请先停止中继。", style = MaterialTheme.typography.bodySmall)
-                                        }
-                                    }
-                                }
+                if (model.isProtectedServer()) {
+                    Card(colors = CardDefaults.cardColors(containerColor = WColors.Secondary.copy(alpha = 0.12f))) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Tips", style = MaterialTheme.typography.titleSmall, color = WColors.Secondary, fontWeight = FontWeight.Bold)
+                            ServerCompatUtils.getTroubleshootingTips().take(3).forEach {
+                                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
                 }
             }
-        )
-    }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("确定") } }
+    )
 }
 
 @Composable
-private fun TexturePackCard() {
-    val context = LocalContext.current
-    val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let { selectedUri ->
-            try {
-                val fileName = context.contentResolver.query(selectedUri, null, null, null, null)?.use { cursor ->
-                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    cursor.moveToFirst()
-                    cursor.getString(nameIndex)
-                } ?: return@let
-
-                if (!fileName.endsWith(".mcpack") && !fileName.endsWith(".mcaddon") && !fileName.endsWith(".mcworld")) {
-                    Toast.makeText(context, "仅支持 .mcpack、.mcaddon 或 .mcworld", Toast.LENGTH_LONG).show()
-                    return@let
-                }
-
-                val tempFile = File(context.cacheDir, fileName)
-                context.contentResolver.openInputStream(selectedUri)?.use { input ->
-                    tempFile.outputStream().use { output -> input.copyTo(output) }
-                }
-
-                val fileUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", tempFile)
-
-                val intent = Intent(Intent.ACTION_VIEW).apply {
-                    setDataAndType(
-                        fileUri,
-                        when {
-                            fileName.endsWith(".mcworld") -> "application/x-world"
-                            fileName.endsWith(".mcpack") -> "application/x-minecraft-resourcepack"
-                            fileName.endsWith(".mcaddon") -> "application/x-minecraft-addon"
-                            else -> "application/octet-stream"
-                        }
-                    )
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    `package` = "com.mojang.minecraftpe"
-                }
-
-                try {
-                    context.startActivity(intent)
-                    Toast.makeText(context, "已发送到 Minecraft", Toast.LENGTH_SHORT).show()
-                } catch (e: ActivityNotFoundException) {
-                    Toast.makeText(context, "未找到 Minecraft：${e.message}", Toast.LENGTH_LONG).show()
-                }
-            } catch (e: Exception) {
-                Toast.makeText(context, "导入失败：${e.message}", Toast.LENGTH_LONG).show()
-            }
-        }
-    }
-
-    WGlassCard(
+private fun ConnectionRow(label: String, value: String, onCopy: () -> Unit) {
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        glowColor = WColors.Secondary,
-        glowIntensity = 0.2f
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Rounded.AddPhotoAlternate, contentDescription = null, tint = WColors.Secondary, modifier = Modifier.size(26.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("材质包与存档", style = MaterialTheme.typography.titleMedium, color = WColors.OnSurface)
-                    Text("导入材质包、附加包与世界。", style = MaterialTheme.typography.bodySmall, color = WColors.OnSurfaceVariant)
-                }
-            }
-            WButton(
-                onClick = { filePickerLauncher.launch("*/*") },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = WColors.Secondary, contentColor = WColors.OnSecondary)
-            ) {
-                Icon(Icons.Rounded.Upload, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("导入")
+        Text(label, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), modifier = Modifier.weight(1f))
+        Row(
+            modifier = Modifier.weight(2f),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(value, style = MaterialTheme.typography.bodyLarge)
+            IconButton(onClick = onCopy) {
+                Icon(
+                    Icons.Rounded.ContentCopy,
+                    contentDescription = "复制",
+                    modifier = Modifier.size(18.dp),
+                    tint = WColors.Primary
+                )
             }
         }
     }
 }
-
-@Composable
-private fun GameFeatureItem(
-    icon: ImageVector,
-    title: String,
-    description: String
-) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = WColors.Secondary, modifier = Modifier.size(16.dp))
-        Column {
-            Text(title, style = MaterialTheme.typography.bodySmall, color = WColors.OnSurface, fontWeight = FontWeight.Medium)
-            Text(description, style = MaterialTheme.typography.labelSmall, color = WColors.OnSurfaceVariant)
-        }
-    }
-}
-

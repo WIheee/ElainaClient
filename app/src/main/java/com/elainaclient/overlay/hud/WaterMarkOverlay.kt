@@ -120,10 +120,12 @@ class WaterMarkOverlay : OverlayWindow() {
 
         var time by remember { mutableStateOf(0f) }
 
+        // ~20 fps is plenty for a shifting gradient and cuts the per-frame recomposition + the
+        // 100-entry gradient rebuild from 60/s to 20/s.
         LaunchedEffect(Unit) {
             while (true) {
-                time += 0.016f
-                delay(16)
+                time += 0.05f
+                delay(50)
             }
         }
 

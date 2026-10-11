@@ -49,7 +49,7 @@ import androidx.compose.ui.unit.sp
 import com.elainaclient.R
 import com.elainaclient.game.module.misc.ArrayListModule
 import com.elainaclient.ui.theme.WColors
-import com.elainaclient.util.translatedSelf
+import com.elainaclient.game.localizedModule
 import kotlinx.coroutines.delay
 import kotlin.math.abs
 import kotlin.math.cos
@@ -195,31 +195,35 @@ class ArrayListOverlay : OverlayWindow() {
     override fun Content() {
         if (!isOverlayEnabled()) return
 
-        var rainbowOffset by remember { mutableStateOf(0f) }
-
-        val infiniteTransition = rememberInfiniteTransition(label = "rainbow")
-        val animatedOffset by infiniteTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(
-                    durationMillis = (3000 / rainbowSpeed).toInt(),
-                    easing = LinearEasing
+        // Only run the rainbow animation when the colour mode actually uses it; in STATIC mode
+        // this avoids a full HUD recomposition every frame.
+        val rainbowOffset: Float = if (colorMode == ArrayListModule.ColorMode.STATIC) {
+            0f
+        } else {
+            val infiniteTransition = rememberInfiniteTransition(label = "rainbow")
+            val animated by infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(
+                        durationMillis = (3000 / rainbowSpeed).toInt().coerceAtLeast(1),
+                        easing = LinearEasing
+                    ),
+                    repeatMode = RepeatMode.Restart
                 ),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "offset"
-        )
-
-        LaunchedEffect(animatedOffset) {
-            rainbowOffset = animatedOffset
+                label = "offset"
+            )
+            animated
         }
 
-        val sortedModules = when (sortMode) {
-            ArrayListModule.SortMode.LENGTH -> modules.sortedByDescending { it.name.length }
-            ArrayListModule.SortMode.ALPHABETICAL -> modules.sortedBy { it.name }
-            ArrayListModule.SortMode.CATEGORY -> modules.sortedBy { it.category }
-            ArrayListModule.SortMode.CUSTOM -> modules.sortedByDescending { it.priority }
+        // Sort only when the module set or sort mode changes (not on every rainbow frame).
+        val sortedModules = remember(modules, sortMode) {
+            when (sortMode) {
+                ArrayListModule.SortMode.LENGTH -> modules.sortedByDescending { it.name.length }
+                ArrayListModule.SortMode.ALPHABETICAL -> modules.sortedBy { it.name }
+                ArrayListModule.SortMode.CATEGORY -> modules.sortedBy { it.category }
+                ArrayListModule.SortMode.CUSTOM -> modules.sortedByDescending { it.priority }
+            }
         }
 
         Column(
@@ -258,13 +262,15 @@ class ArrayListOverlay : OverlayWindow() {
         val moduleColor = getModuleColor(index, rainbowOffset, totalModules)
         val borderWidth = if (showBorder) 2.dp else 0.dp
 
-        val fontFamily = when (fontStyle) {
-            ArrayListModule.FontStyle.MINECRAFT -> try {
-                FontFamily(Font(R.font.minecraft))
-            } catch (e: Exception) {
-                FontFamily.Monospace
+        val fontFamily = remember(fontStyle) {
+            when (fontStyle) {
+                ArrayListModule.FontStyle.MINECRAFT -> try {
+                    FontFamily(Font(R.font.minecraft))
+                } catch (e: Exception) {
+                    FontFamily.Monospace
+                }
+                ArrayListModule.FontStyle.NORMAL -> FontFamily.Default
             }
-            ArrayListModule.FontStyle.NORMAL -> FontFamily.Default
         }
 
         val textShadow = if (glowEffect) {
@@ -359,7 +365,7 @@ class ArrayListOverlay : OverlayWindow() {
                 .padding(horizontal = 8.dp, vertical = 4.dp)
         ) {
             Text(
-                text = module.name.translatedSelf,
+                text = module.name.localizedModule(),
                 color = if (smoothGradient && colorMode == ArrayListModule.ColorMode.SMOOTH_GRADIENT) Color.White else moduleColor,
                 fontSize = fontSize.sp,
                 fontWeight = FontWeight.Medium,

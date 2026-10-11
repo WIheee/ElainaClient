@@ -11,13 +11,15 @@ server that a real MCPE client connects to, opens a second connection out to the
 sits in the middle of the packet stream. Modules observe/rewrite/inject/suppress packets in either
 direction to implement features (combat, motion, visual, world, misc).
 
-Note: game modules here are cheats (killaura, fly, ESP, etc.). This file documents structure only;
-treat module *behavior* as given, don't extend it speculatively.
+Note: The game modules here are cheat features (kill aura, flight, ESP, etc.). When a user requests the creation of a new feature, please ask detailed questions; when enhancing modules, you must be detailed.
 
 ## Modules (Gradle)
 
 - `:app` — Android application (`com.elainaclient`). Compose UI + the module system + the
-  game-state model. Depends on `:relay`.
+  game-state model. Depends on `:relay`. Most deps come from the version catalog
+  (`gradle/libs.versions.toml`), but a few are declared inline in `app/build.gradle.kts`:
+  OkHttp, `androidx.browser` (Chrome Custom Tabs, used by `AuthWebView`), and Coil
+  (`coil-compose` + `coil-gif`). `versionName = "18.0"`, `versionCode = 1`.
 - `:relay` — plain Kotlin/JVM library (`com.elainaclient.relay`). The proxy engine: RakNet server,
   upstream client, codec negotiation, packet listeners, auth handshake. **No Android SDK dependency** —
   it can't use `android.util.Log`; it logs via `println` (visible in logcat for the app process).
@@ -133,7 +135,8 @@ window) draws HUDs/ESP; `RelayService` is a foreground service (`:relay` process
 
 Module categories are the `ModuleCategory` enum (`game/ModuleCategory.kt`) with one subpackage each:
 `module/combat`, `module/motion`, `module/visual`, `module/world`, `module/misc`. Supporting state
-lives alongside: `game/player` (LocalPlayer), `game/world` (Level + chunk palettes), `game/entity`,
+lives alongside: `game/entity` (the entity model — `LocalPlayer`, `Player`, `Entity`, `Item`,
+`MobList`), `game/player` (`PlayerCache`), `game/world` (Level + chunk palettes under `world/chunk`),
 `game/inventory`, `game/friend` (friends list, consulted by combat modules to skip targets).
 
 Chat commands: `.`-prefixed chat lines are intercepted by `CommandManager.handleChat`
@@ -147,10 +150,11 @@ register them; `CommandHandlerModule` (misc) routes incoming chat into it.
 refreshing tokens every 30 min. `AccountManager.GAME_VERSION` and `util/MinecraftUtils.RECOMMENDED_VERSION`
 must stay in sync. Login to Mojang/Xbox uses `net.raphimc:MinecraftAuth`.
 
-Note: the **Realms UI page was removed**, but the backend stays — `AccountManager` still calls
-`RealmsManager.updateSession(...)` (`service/RealmsManager.kt`) and `AuthWebView` uses
-`RealmsAuthFlow.BEDROCK_ANDROID_APPLICATION_CONFIG` (`game/RealmsAuthFlow.kt`). The ad-gate is gone
-entirely (`auth/VerificationManager.kt` and `ui/component/VerificationDialog.kt` were deleted).
+Note: **all Realms support was removed** — `service/RealmsManager.kt`, `model/RealmWorld.kt`, and
+`game/RealmsAuthFlow.kt` are deleted, and `AccountManager` no longer calls `RealmsManager`. The Bedrock
+login MSA config (`BEDROCK_ANDROID_APPLICATION_CONFIG`) that `AuthWebView` uses now lives inline in
+`ui/component/AuthWebView.kt`. The ad-gate is gone entirely (`auth/VerificationManager.kt` and
+`ui/component/VerificationDialog.kt` were deleted).
 
 ### UI (`app`) — portrait, Material 3
 
@@ -175,7 +179,7 @@ picks the target game. Game settings also persist in `SharedPreferences("game_se
   `com.elainaclient.relay`, app label + Compose theme `ElainaClientTheme`, violet `WColors`). UI is
   portrait Material 3. The original GPLv3 `LICENSE` is kept as-is; `README.md` credits the upstream
   WClient project and CloudburstMC/Protocol.
-- Removed from this fork: the Realms UI page, the startup loading screen, and the ad-gate
+- Removed from this fork: Realms (UI *and* backend), the startup loading screen, and the ad-gate
   (`VerificationManager`/`VerificationDialog`). Don't reintroduce them.
 - The codebase carries unusually long explanatory comments documenting past Bedrock-protocol workarounds
   (blob-cache disabling in `GameSession`, block-mapping source ordering, v2168/v2193 codec registration,
@@ -198,6 +202,11 @@ picks the target game. Game settings also persist in `SharedPreferences("game_se
 - This repo lives on a **FUSE mount** (`/storage/emulated/0`): `cp -a` **and** `cp -r` can produce files
   whose `stat` size reads 0 while the content is intact. Copy source trees file-by-file and verify with
   `find <dir> -type f -size 0`.
+- There are **two** `ServerCompatUtils` objects and they are not the same thing:
+  `relay/.../util/ServerCompatUtils.kt` (operates on a `WAddress`, returns `EnhancedServerConfig`
+  presets — this is the one `ConnectionManager` uses) and `app/.../util/ServerCompatUtils.kt`
+  (operates on a `String` hostname, returns UI-facing connection tips / a `ServerConfigType`).
+  Grep the one you actually mean.
 - Companion docs: `PROTOCOL_NOTES.md` (protocol pitfalls + how to upgrade the protocol library),
   `PLACEMENT_FIX_NOTES.md` (item-placement modules).
 - Placement modules (PistonCrystal/Surround/Scaffold) don't hand-build `ItemUse` transactions: they

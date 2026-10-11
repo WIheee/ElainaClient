@@ -45,23 +45,35 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
 import com.elainaclient.R
 import com.elainaclient.overlay.OverlayManager
-import com.elainaclient.util.translatedSelf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 
-private val DarkBackground = Color(0xFF0A0A0A)
-private val CardBackground = Color(0xFF121212)
-private val CardBackgroundExpanded = Color(0xFF1A1212)
-private val AccentPrimary = Color(0xFFE63946)
-private val AccentSecondary = Color(0xFFDC2F3E)
-private val AccentDark = Color(0xFF8B1A1F)
-private val TextPrimary = Color(0xFFE8E8E8)
-private val TextSecondary = Color(0xFFB0B0B0)
-private val BorderColor = Color(0xFF2A1A1A)
-private val BorderColorActive = Color(0xFF3A2222)
-private val ErrorRed = Color(0xFFCF222E)
+// Colours come from the active click-GUI theme (LocalClickGuiStyle), so the same module body
+// renders in every theme. Read via @Composable getters to avoid changing every call site.
+private val DarkBackground: Color
+    @Composable get() = LocalClickGuiStyle.current.background
+private val CardBackground: Color
+    @Composable get() = LocalClickGuiStyle.current.cardBackground
+private val CardBackgroundExpanded: Color
+    @Composable get() = LocalClickGuiStyle.current.cardBackgroundExpanded
+private val AccentPrimary: Color
+    @Composable get() = LocalClickGuiStyle.current.accent
+private val AccentSecondary: Color
+    @Composable get() = LocalClickGuiStyle.current.accentSecondary
+private val AccentDark: Color
+    @Composable get() = LocalClickGuiStyle.current.accentDark
+private val TextPrimary: Color
+    @Composable get() = LocalClickGuiStyle.current.textPrimary
+private val TextSecondary: Color
+    @Composable get() = LocalClickGuiStyle.current.textSecondary
+private val BorderColor: Color
+    @Composable get() = LocalClickGuiStyle.current.border
+private val BorderColorActive: Color
+    @Composable get() = LocalClickGuiStyle.current.borderActive
+private val ErrorRed: Color
+    @Composable get() = LocalClickGuiStyle.current.errorRed
 
 private val moduleCache = HashMap<ModuleCategory, List<Module>>()
 
@@ -90,7 +102,7 @@ fun ModuleContent(moduleCategory: ModuleCategory) {
                 contentPadding = PaddingValues(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(list.size) { i -> ModuleCard(list[i]) }
+                items(list.size, key = { i -> list[i].name }) { i -> ModuleCard(list[i]) }
             }
         } else {
             Box(Modifier.fillMaxSize()) {
@@ -145,7 +157,7 @@ private fun ModuleCard(module: Module) {
                 modifier = Modifier.padding(16.dp)
             ) {
                 Text(
-                    module.name.translatedSelf,
+                    module.name.localizedModule(),
                     style = MaterialTheme.typography.titleMedium,
                     color = if (module.isEnabled) AccentPrimary else TextPrimary
                 )
@@ -188,7 +200,7 @@ private fun ModuleCard(module: Module) {
 private fun ChoiceValueContent(value: ListValue) {
     Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) {
         Text(
-            value.name.translatedSelf,
+            value.name.localizedOption(),
             style = MaterialTheme.typography.bodyMedium,
             color = TextSecondary,
             modifier = Modifier.padding(bottom = 8.dp)
@@ -198,7 +210,7 @@ private fun ChoiceValueContent(value: ListValue) {
                 ElevatedFilterChip(
                     selected = value.value == item,
                     onClick = { if (value.value != item) value.value = item },
-                    label = { Text(item.name.translatedSelf) },
+                    label = { Text(item.name.localizedOption()) },
                     modifier = Modifier.height(32.dp),
                     enabled = true,
                     colors = FilterChipDefaults.filterChipColors(
@@ -229,7 +241,7 @@ private fun FloatValueContent(value: FloatValue) {
     Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) {
         Row(modifier = Modifier.padding(bottom = 4.dp)) {
             Text(
-                value.name.translatedSelf,
+                value.name.localizedOption(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextSecondary
             )
@@ -278,7 +290,7 @@ private fun IntValueContent(value: IntValue) {
     Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) {
         Row(modifier = Modifier.padding(bottom = 4.dp)) {
             Text(
-                value.name.translatedSelf,
+                value.name.localizedOption(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextSecondary
             )
@@ -337,7 +349,7 @@ private fun BoolValueContent(value: BoolValue) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            value.name.translatedSelf,
+            value.name.localizedOption(),
             style = MaterialTheme.typography.bodyMedium,
             color = TextSecondary
         )
@@ -404,7 +416,7 @@ private fun ShortcutContent(module: Module) {
 private fun <T : Enum<T>> EnumValueContent(value: EnumValue<T>) {
     Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) {
         Text(
-            value.name.translatedSelf,
+            value.name.localizedOption(),
             style = MaterialTheme.typography.bodyMedium,
             color = TextSecondary,
             modifier = Modifier.padding(bottom = 8.dp)
@@ -414,7 +426,7 @@ private fun <T : Enum<T>> EnumValueContent(value: EnumValue<T>) {
                 ElevatedFilterChip(
                     selected = value.value == option,
                     onClick = { if (value.value != option) value.value = option },
-                    label = { Text(option.name.translatedSelf) },
+                    label = { Text(option.name.localizedOption()) },
                     modifier = Modifier.height(32.dp),
                     enabled = true,
                     colors = FilterChipDefaults.filterChipColors(
@@ -444,7 +456,7 @@ private fun <T : Enum<T>> EnumValueContent(value: EnumValue<T>) {
 private fun StringValueContent(value: StringValue) {
     Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) {
         Text(
-            value.name.translatedSelf,
+            value.name.localizedOption(),
             style = MaterialTheme.typography.bodyMedium,
             color = TextSecondary,
             modifier = Modifier.padding(bottom = 8.dp)

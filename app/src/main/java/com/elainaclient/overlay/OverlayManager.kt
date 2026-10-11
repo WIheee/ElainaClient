@@ -15,6 +15,7 @@ import com.elainaclient.game.ModuleManager
 import com.elainaclient.ui.theme.ElainaClientTheme
 import com.elainaclient.overlay.gui.classic.OverlayButton
 import com.elainaclient.overlay.gui.classic.OverlayShortcutButton
+import com.elainaclient.overlay.gui.createClickGUI
 
 import kotlinx.coroutines.launch
 
@@ -34,41 +35,39 @@ object OverlayManager {
     private var currentClickGUI: OverlayWindow? = null
     private var currentClickGUIOverlay: OverlayWindow? = null
 
-    private fun getGUITheme(context: Context): GUITheme {
-        val sharedPreferences = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-        return try {
-            GUITheme.valueOf(
-                sharedPreferences.getString("gui_theme", "CLASSIC") ?: "CLASSIC"
-            )
-        } catch (_: Exception) {
-            GUITheme.CLASSIC
-        }
-    }
+    private fun getGUITheme(context: Context): GUITheme = GUITheme.fromPref(context)
 
     private fun initializeOverlays(context: Context) {
-        val theme = getGUITheme(context)
-
-
         overlayWindows.clear()
         currentOverlayButton = null
         currentClickGUI = null
         currentClickGUIOverlay = null
 
-
-        when (theme) {
-            GUITheme.CLASSIC -> {
-                currentOverlayButton = OverlayButton()
-                overlayWindows.addAll(
-                    ModuleManager
-                        .modules
-                        .filter { it.isShortcutDisplayed }
-                        .map { it.overlayShortcutButton }
-                )
-            }
-        }
-
-
+        // The launcher button + shortcut buttons are theme-independent; only the click GUI
+        // is skinned by the selected theme.
+        currentOverlayButton = OverlayButton()
+        overlayWindows.addAll(
+            ModuleManager.modules
+                .filter { it.isShortcutDisplayed }
+                .map { it.overlayShortcutButton }
+        )
         currentOverlayButton?.let { overlayWindows.add(it) }
+    }
+
+    /** Opens the click GUI using the currently selected theme (created lazily, cached). */
+    fun openClickGUI() {
+        val context = currentContext ?: return
+        val gui = currentClickGUI ?: getGUITheme(context).createClickGUI().also { currentClickGUI = it }
+        showOverlayWindow(gui)
+    }
+
+    /** Re-attaches all overlays so a newly selected theme takes effect. */
+    fun applyTheme() {
+        val context = currentContext ?: return
+        if (isShowing) {
+            dismiss()
+            show(context)
+        }
     }
 
     fun showOverlayWindow(overlayWindow: OverlayWindow) {
@@ -95,15 +94,10 @@ object OverlayManager {
 
         initializeOverlays(context)
 
-        val theme = getGUITheme(context)
-        when (theme) {
-
-            GUITheme.CLASSIC -> {
-
-                overlayWindows.forEach {
-                    showOverlayWindow(context, it)
-                }
-            }
+        // Show every registered window regardless of GUI theme (this also lets the notification
+        // overlay attach without being gated on the classic theme).
+        overlayWindows.forEach {
+            showOverlayWindow(context, it)
         }
 
         isShowing = true
@@ -112,15 +106,8 @@ object OverlayManager {
     fun dismiss() {
         val context = currentContext
         if (context != null) {
-            val theme = getGUITheme(context)
-            when (theme) {
-
-                GUITheme.CLASSIC -> {
-
-                    overlayWindows.forEach {
-                        dismissOverlayWindow(context, it)
-                    }
-                }
+            overlayWindows.forEach {
+                dismissOverlayWindow(context, it)
             }
             isShowing = false
         }

@@ -37,6 +37,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,20 +54,33 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elainaclient.R
+import com.elainaclient.game.LocalClickGuiStyle
 import com.elainaclient.game.ModuleCategory
 import com.elainaclient.game.ModuleContent
+import com.elainaclient.overlay.GUITheme
 import com.elainaclient.overlay.OverlayManager
 import com.elainaclient.overlay.OverlayWindow
 
-private val DarkBackground = Color(0xFF0A0A0A)
-private val SidebarBackground = Color(0xFF1A1212)
-private val HeaderBackground = Color(0xFF161212)
-private val AccentPrimary = Color(0xFFE63946)
-private val TextPrimary = Color(0xFFE8E8E8)
-private val TextSecondary = Color(0xFFB0B0B0)
-private val ButtonBackground = Color(0xFF251A1A)
+private val DarkBackground: Color
+    @Composable get() = LocalClickGuiStyle.current.background
+private val SidebarBackground: Color
+    @Composable get() = LocalClickGuiStyle.current.sidebarBackground
+private val HeaderBackground: Color
+    @Composable get() = LocalClickGuiStyle.current.headerBackground
+private val AccentPrimary: Color
+    @Composable get() = LocalClickGuiStyle.current.accent
+private val TextPrimary: Color
+    @Composable get() = LocalClickGuiStyle.current.textPrimary
+private val TextSecondary: Color
+    @Composable get() = LocalClickGuiStyle.current.textSecondary
+private val ButtonBackground: Color
+    @Composable get() = LocalClickGuiStyle.current.buttonBackground
+private val TextMuted: Color
+    @Composable get() = LocalClickGuiStyle.current.textMuted
 
-class OverlayClickGUI : OverlayWindow() {
+class OverlayClickGUI(
+    private val theme: GUITheme = GUITheme.CLASSIC
+) : OverlayWindow() {
 
     private val _layoutParams by lazy {
         super.layoutParams.apply {
@@ -91,6 +105,7 @@ class OverlayClickGUI : OverlayWindow() {
         val context = LocalContext.current
         val snackbarHostState = remember { SnackbarHostState() }
 
+        CompositionLocalProvider(LocalClickGuiStyle provides theme.style) {
         Box(
             Modifier
                 .fillMaxSize()
@@ -153,6 +168,7 @@ class OverlayClickGUI : OverlayWindow() {
                         .padding(16.dp)
                 )
             }
+        }
         }
     }
 
@@ -296,14 +312,14 @@ class OverlayClickGUI : OverlayWindow() {
             ) {
                 Icon(
                     painter = painterResource(category.iconResId),
-                    contentDescription = category.name,
-                    tint = if (isSelected) AccentPrimary else Color(0xFF666666),
+                    contentDescription = category.displayName,
+                    tint = if (isSelected) AccentPrimary else TextMuted,
                     modifier = Modifier.size(20.dp)
                 )
             }
             Text(
-                text = category.name,
-                color = if (isSelected) AccentPrimary else Color(0xFF666666),
+                text = category.displayName,
+                color = if (isSelected) AccentPrimary else TextMuted,
                 fontSize = 9.sp,
                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                 maxLines = 1,

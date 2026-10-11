@@ -35,7 +35,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.contentColorFor
 import com.elainaclient.ui.component.WGlassCard
 import com.elainaclient.ui.component.WFloatingActionButton
-import com.elainaclient.ui.theme.WColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -77,7 +76,7 @@ fun AccountPageContent() {
                         Text(
                             stringResource(R.string.account),
                             style = MaterialTheme.typography.headlineMedium,
-                            color = WColors.OnSurface
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     },
                     actions = {
@@ -99,8 +98,8 @@ fun AccountPageContent() {
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = WColors.Background,
-                        titleContentColor = WColors.OnSurface
+                        containerColor = MaterialTheme.colorScheme.background,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
                     )
                 )
             },
@@ -111,7 +110,7 @@ fun AccountPageContent() {
                         .animateContentSize()
                 )
             },
-            containerColor = WColors.Background
+            containerColor = MaterialTheme.colorScheme.background
         ) {
             Box(
                 Modifier

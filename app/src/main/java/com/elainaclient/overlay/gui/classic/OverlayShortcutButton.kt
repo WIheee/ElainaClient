@@ -22,8 +22,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.clickable
 import com.elainaclient.game.Module
+import com.elainaclient.game.localizedModule
 import com.elainaclient.overlay.OverlayWindow
-import com.elainaclient.util.translatedSelf
 import kotlin.math.min
 
 class OverlayShortcutButton(
@@ -93,7 +93,7 @@ class OverlayShortcutButton(
         ) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    text = module.name.translatedSelf,
+                    text = module.name.localizedModule(),
                     color = textColor,
                     style = MaterialTheme.typography.labelMedium
                 )

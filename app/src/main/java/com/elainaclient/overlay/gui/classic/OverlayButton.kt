@@ -36,8 +36,6 @@ class OverlayButton : OverlayWindow() {
     override val layoutParams: WindowManager.LayoutParams
         get() = _layoutParams
 
-    private val overlayClickGUI by lazy { OverlayClickGUI() }
-
     @Composable
     override fun Content() {
         val context = LocalContext.current
@@ -53,7 +51,7 @@ class OverlayButton : OverlayWindow() {
         }
 
         ElevatedCard(
-            onClick = { OverlayManager.showOverlayWindow(overlayClickGUI) },
+            onClick = { OverlayManager.openClickGUI() },
             shape = MaterialTheme.shapes.medium,
             modifier = Modifier
                 .padding(5.dp)

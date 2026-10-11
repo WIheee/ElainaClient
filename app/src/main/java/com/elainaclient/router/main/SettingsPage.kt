@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.Opacity
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.SaveAlt
@@ -24,9 +25,10 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import com.elainaclient.R
 import com.elainaclient.game.ModuleManager
+import com.elainaclient.overlay.GUITheme
 import com.elainaclient.overlay.OverlayManager
-import com.elainaclient.ui.component.WGlassCard
-import com.elainaclient.ui.theme.WColors
+import com.elainaclient.ui.theme.AppTheme
+import com.elainaclient.ui.theme.ThemeMode
 import com.elainaclient.util.LocalSnackbarHostState
 import com.elainaclient.util.SnackbarHostStateScope
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +37,12 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
+
+private fun themeModeLabel(mode: ThemeMode): String = when (mode) {
+    ThemeMode.SYSTEM -> "跟随系统"
+    ThemeMode.LIGHT -> "浅色"
+    ThemeMode.DARK -> "深色"
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,6 +54,8 @@ fun SettingsPageContent() {
         val prefs = remember { context.getSharedPreferences("settings", Context.MODE_PRIVATE) }
 
         var showOpacityDialog by rememberSaveable { mutableStateOf(false) }
+        var showThemeDialog by rememberSaveable { mutableStateOf(false) }
+        var showGuiThemeDialog by rememberSaveable { mutableStateOf(false) }
         var showFileNameDialog by rememberSaveable { mutableStateOf(false) }
         var configFileName by rememberSaveable { mutableStateOf("") }
         var isExporting by remember { mutableStateOf(false) }
@@ -107,17 +117,17 @@ fun SettingsPageContent() {
                         Text(
                             stringResource(R.string.settings),
                             style = MaterialTheme.typography.headlineMedium,
-                            color = WColors.OnSurface
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = WColors.Background,
-                        titleContentColor = WColors.OnSurface
+                        containerColor = MaterialTheme.colorScheme.background,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
                     )
                 )
             },
             bottomBar = { SnackbarHost(LocalSnackbarHostState.current) },
-            containerColor = WColors.Background
+            containerColor = MaterialTheme.colorScheme.background
         ) { padding ->
             Column(
                 Modifier
@@ -155,26 +165,55 @@ fun SettingsPageContent() {
                     }
                 }
 
-                WGlassCard(
+                OutlinedCard(
                     modifier = Modifier.fillMaxWidth(),
-                    glowColor = WColors.Secondary,
-                    glowIntensity = 0.3f
+                    onClick = { showThemeDialog = true }
                 ) {
                     Row(
-                        Modifier.padding(20.dp),
+                        Modifier.padding(15.dp),
                         horizontalArrangement = Arrangement.spacedBy(15.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Rounded.Palette, null, tint = WColors.Secondary, modifier = Modifier.size(24.dp))
+                        Icon(Icons.Rounded.DarkMode, null, modifier = Modifier.size(24.dp))
                         Column(Modifier.weight(1f)) {
-                            Text("界面主题", style = MaterialTheme.typography.titleMedium, color = WColors.OnSurface)
+                            Text("外观主题", style = MaterialTheme.typography.bodyLarge)
                             Text(
-                                "经典悬浮主题（默认）",
+                                themeModeLabel(AppTheme.mode),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = WColors.OnSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        Text("经典", style = MaterialTheme.typography.bodyMedium, color = WColors.Secondary)
+                        Icon(
+                            Icons.Rounded.Settings, null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.scale(0.8f).size(20.dp)
+                        )
+                    }
+                }
+
+                OutlinedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { showGuiThemeDialog = true }
+                ) {
+                    Row(
+                        Modifier.padding(15.dp),
+                        horizontalArrangement = Arrangement.spacedBy(15.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Rounded.Palette, null, modifier = Modifier.size(24.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("点击界面主题", style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                GUITheme.fromPref(context).displayName,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            Icons.Rounded.Settings, null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.scale(0.8f).size(20.dp)
+                        )
                     }
                 }
 
@@ -320,6 +359,93 @@ fun SettingsPageContent() {
                                         }
                                         Text(if (isExporting) "保存中…" else "导出")
                                     }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (showGuiThemeDialog) {
+            val currentGuiTheme = GUITheme.fromPref(context)
+            BasicAlertDialog(
+                onDismissRequest = { showGuiThemeDialog = false },
+                modifier = Modifier.padding(vertical = 24.dp)
+            ) {
+                Surface(
+                    shape = AlertDialogDefaults.shape,
+                    tonalElevation = AlertDialogDefaults.TonalElevation
+                ) {
+                    Column(
+                        Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            "点击界面主题",
+                            style = MaterialTheme.typography.headlineSmall,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        GUITheme.entries.forEach { guiTheme ->
+                            OutlinedCard(
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = {
+                                    prefs.edit { putString(GUITheme.PREF_KEY, guiTheme.name) }
+                                    OverlayManager.applyTheme()
+                                    showGuiThemeDialog = false
+                                }
+                            ) {
+                                Row(
+                                    Modifier.padding(15.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(selected = currentGuiTheme == guiTheme, onClick = null)
+                                    Text(guiTheme.displayName, style = MaterialTheme.typography.bodyLarge)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (showThemeDialog) {
+            val currentMode = AppTheme.mode
+            BasicAlertDialog(
+                onDismissRequest = { showThemeDialog = false },
+                modifier = Modifier.padding(vertical = 24.dp)
+            ) {
+                Surface(
+                    shape = AlertDialogDefaults.shape,
+                    tonalElevation = AlertDialogDefaults.TonalElevation
+                ) {
+                    Column(
+                        Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            "外观主题",
+                            style = MaterialTheme.typography.headlineSmall,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        ThemeMode.entries.forEach { option ->
+                            OutlinedCard(
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = {
+                                    AppTheme.set(context, option)
+                                    showThemeDialog = false
+                                }
+                            ) {
+                                Row(
+                                    Modifier.padding(15.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(selected = currentMode == option, onClick = null)
+                                    Text(themeModeLabel(option), style = MaterialTheme.typography.bodyLarge)
                                 }
                             }
                         }

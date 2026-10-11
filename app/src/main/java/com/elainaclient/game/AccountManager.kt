@@ -6,7 +6,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.google.gson.JsonParser
 import com.elainaclient.application.AppContext
-import com.elainaclient.service.RealmsManager
 import com.elainaclient.relay.util.AuthUtils
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
@@ -52,8 +51,6 @@ object AccountManager {
         _accounts.addAll(fetchedAccounts)
         selectedAccount = fetchSelectedAccount()
 
-        RealmsManager.updateSession(selectedAccount)
-
         startTokenRefreshScheduler()
     }
 
@@ -88,8 +85,6 @@ object AccountManager {
 
     fun selectAccount(account: WAccount?) {
         selectedAccount = account
-
-        RealmsManager.updateSession(account)
 
         coroutineScope.launch {
             val file = File(AppContext.instance.cacheDir, "accounts")

@@ -382,10 +382,10 @@ class TargetHudOverlay : OverlayWindow() {
                                 if (showStatus) {
                                     Text(
                                         text = when {
-                                            animatedDistance <= 5f -> "DANGER"
-                                            animatedDistance <= 15f -> "CLOSE"
-                                            animatedDistance <= 30f -> "MEDIUM"
-                                            else -> "FAR"
+                                            animatedDistance <= 5f -> "危险"
+                                            animatedDistance <= 15f -> "近"
+                                            animatedDistance <= 30f -> "中"
+                                            else -> "远"
                                         },
                                         color = statusColor,
                                         fontSize = 12.sp,

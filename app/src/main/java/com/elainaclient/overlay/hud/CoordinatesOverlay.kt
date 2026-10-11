@@ -200,7 +200,11 @@ class CoordinatesOverlay : OverlayWindow() {
 
         var rainbowOffset by mutableFloatStateOf(0f)
 
-        LaunchedEffect(Unit) {
+        // Only tick while the rainbow colour mode is active — avoids a per-frame recomposition
+        // when the text is a static colour.
+        val animates = colorMode == CoordinatesModule.ColorMode.RAINBOW
+        LaunchedEffect(animates) {
+            if (!animates) return@LaunchedEffect
             while (true) {
                 rainbowOffset += 0.02f
                 if (rainbowOffset > 1f) rainbowOffset = 0f
@@ -265,7 +269,7 @@ class CoordinatesOverlay : OverlayWindow() {
             if (showCoordinates) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "XYZ:",
+                        text = "坐标:",
                         color = textColor.copy(alpha = 0.8f),
                         fontSize = fontSize.sp,
                         fontWeight = FontWeight.Bold
@@ -283,14 +287,14 @@ class CoordinatesOverlay : OverlayWindow() {
             if (showDirection) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "Facing:",
+                        text = "朝向:",
                         color = textColor.copy(alpha = 0.8f),
                         fontSize = fontSize.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = direction,
+                        text = directionZh(direction),
                         color = getDirectionColor(direction),
                         fontSize = fontSize.sp,
                         fontWeight = FontWeight.Medium
@@ -301,14 +305,14 @@ class CoordinatesOverlay : OverlayWindow() {
             if (showDimension) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "Dimension:",
+                        text = "维度:",
                         color = textColor.copy(alpha = 0.8f),
                         fontSize = fontSize.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = dimension,
+                        text = dimensionZh(dimension),
                         color = getDimensionColor(dimension),
                         fontSize = fontSize.sp,
                         fontWeight = FontWeight.Medium
@@ -319,7 +323,7 @@ class CoordinatesOverlay : OverlayWindow() {
             if (showSpeed) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "Speed:",
+                        text = "速度:",
                         color = textColor.copy(alpha = 0.8f),
                         fontSize = fontSize.sp,
                         fontWeight = FontWeight.Bold
@@ -337,7 +341,7 @@ class CoordinatesOverlay : OverlayWindow() {
             if (showNetherCoords && dimension != "Nether") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "Nether:",
+                        text = "下界:",
                         color = textColor.copy(alpha = 0.8f),
                         fontSize = fontSize.sp,
                         fontWeight = FontWeight.Bold
@@ -388,6 +392,25 @@ class CoordinatesOverlay : OverlayWindow() {
             CoordinatesModule.ColorMode.DIMENSION_BASED -> getDimensionColor(dimension)
             CoordinatesModule.ColorMode.SPEED_BASED -> getSpeedColor(speed)
         }
+    }
+
+    private fun directionZh(dir: String): String = when (dir) {
+        "North" -> "北"
+        "South" -> "南"
+        "East" -> "东"
+        "West" -> "西"
+        "Northeast" -> "东北"
+        "Northwest" -> "西北"
+        "Southeast" -> "东南"
+        "Southwest" -> "西南"
+        else -> dir
+    }
+
+    private fun dimensionZh(dim: String): String = when (dim) {
+        "Overworld" -> "主世界"
+        "Nether" -> "下界"
+        "End" -> "末地"
+        else -> dim
     }
 
     private fun getDirectionColor(dir: String): Color {

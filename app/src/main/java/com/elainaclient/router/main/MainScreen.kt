@@ -1,25 +1,35 @@
 package com.elainaclient.router.main
 
+import android.content.res.Configuration
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountCircle
-import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Dashboard
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -27,70 +37,104 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.elainaclient.ui.theme.WColors
+import com.elainaclient.R
 import com.elainaclient.viewmodel.MainScreenViewModel
 
+/**
+ * Shell pages. The dashboard (HomePage) also hosts the server picker, so there is no
+ * separate "servers" page anymore.
+ */
 @Immutable
 enum class MainScreenPages(
     val icon: ImageVector,
-    val label: String,
+    val labelResId: Int,
     val content: @Composable () -> Unit
 ) {
-    HomePage(Icons.Rounded.Home, "主页", { HomePageContent() }),
-    AccountPage(Icons.Rounded.AccountCircle, "账号", { AccountPageContent() }),
-    ServerPage(Icons.Rounded.Storage, "服务器", { ServerPageContent() }),
-    SettingsPage(Icons.Rounded.Settings, "设置", { SettingsPageContent() }),
-    AboutPage(Icons.Rounded.Info, "关于", { AboutPageContent() })
+    HomePage(Icons.Rounded.Dashboard, R.string.home, { HomePageContent() }),
+    AccountPage(Icons.Rounded.AccountCircle, R.string.account, { AccountPageContent() }),
+    AboutPage(Icons.Rounded.Info, R.string.about, { AboutPageContent() }),
+    SettingsPage(Icons.Rounded.Settings, R.string.settings, { SettingsPageContent() })
 }
 
-@OptIn(ExperimentalAnimationApi::class)
+/**
+ * Adaptive shell: a [NavigationRail] in landscape, a bottom [NavigationBar] in portrait.
+ * Each page owns its own Scaffold/TopAppBar, so the shell only provides navigation.
+ */
 @Composable
 fun MainScreen() {
     val vm: MainScreenViewModel = viewModel()
     val selectedPage by vm.selectedPage.collectAsStateWithLifecycle()
     val pages = remember { MainScreenPages.entries.toList() }
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(WColors.Background)
-    ) {
-        Box(
+    if (isLandscape) {
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
         ) {
-            AnimatedContent(
-                targetState = selectedPage,
-                transitionSpec = {
-                    slideInHorizontally(
-                        initialOffsetX = { it / 3 },
-                        animationSpec = tween(320, easing = FastOutSlowInEasing)
-                    ) + fadeIn(tween(240)) togetherWith
-                            slideOutHorizontally(
-                                targetOffsetX = { -it / 4 },
-                                animationSpec = tween(280, easing = FastOutSlowInEasing)
-                            ) + fadeOut(tween(200))
-                },
-                label = "page_transition"
-            ) { page ->
-                page.content()
+            NavigationRail(containerColor = MaterialTheme.colorScheme.surface) {
+                Spacer(Modifier.height(16.dp))
+                pages.forEach { page ->
+                    NavigationRailItem(
+                        selected = page == selectedPage,
+                        onClick = { if (selectedPage != page) vm.selectPage(page) },
+                        icon = { Icon(page.icon, contentDescription = null) },
+                        label = { Text(stringResource(page.labelResId)) }
+                    )
+                }
+            }
+            Box(Modifier.weight(1f).fillMaxHeight()) {
+                PageHost(selectedPage)
             }
         }
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                PageHost(selectedPage)
+            }
+            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                pages.forEach { page ->
+                    NavigationBarItem(
+                        selected = page == selectedPage,
+                        onClick = { if (selectedPage != page) vm.selectPage(page) },
+                        icon = { Icon(page.icon, contentDescription = null) },
+                        label = { Text(stringResource(page.labelResId)) }
+                    )
+                }
+            }
+        }
+    }
+}
 
-        NavigationBar(
-            containerColor = WColors.Surface
-        ) {
-            pages.forEach { page ->
-                NavigationBarItem(
-                    selected = page == selectedPage,
-                    onClick = { if (selectedPage != page) vm.selectPage(page) },
-                    icon = { Icon(page.icon, contentDescription = page.label) },
-                    label = { Text(page.label) }
-                )
-            }
-        }
+@OptIn(ExperimentalAnimationApi::class)
+@Composable
+private fun PageHost(page: MainScreenPages) {
+    AnimatedContent(
+        targetState = page,
+        transitionSpec = {
+            val forward = targetState.ordinal > initialState.ordinal
+            val enter = slideInHorizontally(
+                animationSpec = tween(320, easing = FastOutSlowInEasing),
+                initialOffsetX = { if (forward) it else -it }
+            ) + fadeIn(tween(240))
+            val exit = slideOutHorizontally(
+                animationSpec = tween(280, easing = FastOutSlowInEasing),
+                targetOffsetX = { if (forward) -it else it }
+            ) + fadeOut(tween(200))
+            enter togetherWith exit
+        },
+        label = "page_transition"
+    ) { selected ->
+        selected.content()
     }
 }

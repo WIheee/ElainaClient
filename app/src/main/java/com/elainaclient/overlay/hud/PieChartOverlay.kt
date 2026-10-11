@@ -84,6 +84,19 @@ class PieChartOverlay : OverlayWindow() {
         "Unspecified" to Color(0xFFC0C0C0)     // Light Gray
     )
 
+    private fun categoryZh(category: String): String = when (category) {
+        "Rendering" -> "渲染"
+        "Entities" -> "实体"
+        "Movement" -> "移动"
+        "Sound" -> "声音"
+        "Block Updates" -> "方块更新"
+        "Effects" -> "效果"
+        "Network" -> "网络"
+        "World Tick" -> "世界刻"
+        "Unspecified" -> "其他"
+        else -> category
+    }
+
     companion object {
         val overlayInstance by lazy { PieChartOverlay() }
         private var shouldShowOverlay = false
@@ -288,11 +301,12 @@ class PieChartOverlay : OverlayWindow() {
                             )
                             val isLargest = category == largestCategory
                             
+                            val label = categoryZh(category)
                             Text(
                                 text = if (showPercentages) {
-                                    "$category ${String.format("%.2f", percentage)}%"
+                                    "$label ${String.format("%.2f", percentage)}%"
                                 } else {
-                                    category
+                                    label
                                 },
                                 color = if (isLargest) color.copy(alpha = 1f) else color.copy(alpha = 0.9f),
                                 fontSize = legendFontSize.sp,

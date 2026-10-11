@@ -38,12 +38,12 @@ fun AboutPageContent() {
                         Text(
                             stringResource(R.string.about),
                             style = MaterialTheme.typography.headlineMedium,
-                            color = WColors.OnSurface
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = WColors.Background,
-                        titleContentColor = WColors.OnSurface
+                        containerColor = MaterialTheme.colorScheme.background,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
                     )
                 )
             },
@@ -53,7 +53,7 @@ fun AboutPageContent() {
                     modifier = Modifier.animateContentSize()
                 )
             },
-            containerColor = WColors.Background
+            containerColor = MaterialTheme.colorScheme.background
         ) { paddingValues ->
             Column(
                 modifier = Modifier
@@ -94,7 +94,7 @@ private fun AppInfoSection() {
             Text(
                 text = "RetrivedMods",
                 style = MaterialTheme.typography.titleMedium,
-                color = WColors.OnSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(4.dp))
             Surface(
@@ -126,13 +126,13 @@ private fun LicenseSection() {
             Text(
                 text = "许可证",
                 style = MaterialTheme.typography.headlineSmall,
-                color = WColors.OnSurface,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center
             )
 
             HorizontalDivider(
-                color = WColors.OnSurfaceVariant.copy(alpha = 0.2f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
             )
 
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -185,12 +185,12 @@ private fun BulletPoint(text: String) {
         Text(
             text = "•",
             style = MaterialTheme.typography.bodyMedium,
-            color = WColors.OnSurface
+            color = MaterialTheme.colorScheme.onSurface
         )
         Text(
             text = text,
             style = MaterialTheme.typography.bodyMedium,
-            color = WColors.OnSurface
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }
@@ -199,7 +199,7 @@ private fun BulletPoint(text: String) {
 private fun LegalSection() {
     WGlassCard(
         modifier = Modifier.fillMaxWidth(),
-        glowColor = WColors.OnSurfaceVariant,
+        glowColor = MaterialTheme.colorScheme.onSurfaceVariant,
         glowIntensity = 0.2f
     ) {
         Column(
@@ -209,13 +209,13 @@ private fun LegalSection() {
             Text(
                 text = "法律",
                 style = MaterialTheme.typography.headlineSmall,
-                color = WColors.OnSurface,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center
             )
 
             HorizontalDivider(
-                color = WColors.OnSurfaceVariant.copy(alpha = 0.2f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
             )
 
             LegalItem(
@@ -242,12 +242,12 @@ private fun LegalItem(title: String, content: String) {
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmall,
-            color = WColors.OnSurface
+            color = MaterialTheme.colorScheme.onSurface
         )
         Text(
             text = content,
             style = MaterialTheme.typography.bodySmall,
-            color = WColors.OnSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             lineHeight = MaterialTheme.typography.bodySmall.lineHeight.times(1.5f)
         )
     }
@@ -267,19 +267,19 @@ private fun 致谢Section(context: android.content.Context) {
             Text(
                 text = "致谢",
                 style = MaterialTheme.typography.headlineSmall,
-                color = WColors.OnSurface,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center
             )
 
             HorizontalDivider(
-                color = WColors.OnSurfaceVariant.copy(alpha = 0.2f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
             )
 
             Text(
                 text = "特别感谢让这个项目成为可能的贡献者们。",
                 style = MaterialTheme.typography.bodyMedium,
-                color = WColors.OnSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -333,19 +333,19 @@ private fun ContributorItem(
                 Text(
                     text = name,
                     style = MaterialTheme.typography.titleSmall,
-                    color = WColors.OnSurface
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = WColors.OnSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             if (githubUrl != null) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.OpenInNew,
                     contentDescription = "在 GitHub 查看",
-                    tint = WColors.OnSurfaceVariant,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -376,12 +376,12 @@ private fun SourceCodeSection(context: android.content.Context) {
                 Text(
                     text = "源代码",
                     style = MaterialTheme.typography.titleMedium,
-                    color = WColors.OnSurface
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = "在 GitHub 查看",
                     style = MaterialTheme.typography.bodySmall,
-                    color = WColors.OnSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Icon(

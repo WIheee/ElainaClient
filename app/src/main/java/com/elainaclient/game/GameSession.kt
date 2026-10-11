@@ -130,18 +130,9 @@ class GameSession(val wRelaySession: WRelaySession) : ComposedPacketHandler {
 
         when (packet) {
             is StartGamePacket -> {
-                try {
-                    val itemDefinitions = SimpleDefinitionRegistry.builder<ItemDefinition>()
-                        .addAll(packet.itemDefinitions)
-                        .build()
-
-                    wRelaySession.server.peer.codecHelper.itemDefinitions = itemDefinitions
-                    wRelaySession.client?.peer?.codecHelper?.itemDefinitions = itemDefinitions
-
-                    Log.i("GameSession", "Successfully set up codecHelper itemDefinitions: ${packet.itemDefinitions.size} items")
-                } catch (e: Exception) {
-                    Log.e("GameSession", "Failed to set up codecHelper itemDefinitions", e)
-                }
+                // Item definitions are installed from ItemComponentPacket (handled below); the
+                // StartGamePacket `itemDefinitions` field is deprecated since protocol v776 and is
+                // empty on modern servers, so it is no longer read here.
 
                 if (!startGameReceived) {
                     startGameReceived = true

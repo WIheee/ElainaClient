@@ -9,7 +9,6 @@ import com.elainaclient.game.utils.misc.removeNetInfo
 import com.elainaclient.util.PacketDebugLog
 import org.cloudburstmc.math.vector.Vector3f
 import org.cloudburstmc.math.vector.Vector3i
-import org.cloudburstmc.protocol.bedrock.data.AuthoritativeMovementMode
 import org.cloudburstmc.protocol.bedrock.data.SoundEvent
 import org.cloudburstmc.protocol.bedrock.data.inventory.ItemData
 import org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventoryActionData
@@ -60,9 +59,9 @@ class LocalPlayer(val session: GameSession) : Player(0L, 0L, UUID.randomUUID(), 
             runtimeEntityId = packet.runtimeEntityId
             uniqueEntityId = packet.uniqueEntityId
 
-            movementServerAuthoritative =
-                packet.authoritativeMovementMode != AuthoritativeMovementMode.CLIENT
-            packet.authoritativeMovementMode = AuthoritativeMovementMode.SERVER
+            // `authoritativeMovementMode` is legacy: since protocol v818 the only movement mode is
+            // server-authoritative with rewind, so movement is always server-authoritative.
+            movementServerAuthoritative = true
             inventoriesServerAuthoritative = packet.isInventoriesServerAuthoritative
             blockBreakServerAuthoritative = packet.isServerAuthoritativeBlockBreaking
             soundServerAuthoritative = packet.networkPermissions.isServerAuthSounds

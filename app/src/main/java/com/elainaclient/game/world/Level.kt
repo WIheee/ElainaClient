@@ -409,9 +409,9 @@ class Level(val session: GameSession) {
             }
 
             is PlayerListPacket -> {
-                val add = packet.action == PlayerListPacket.Action.ADD
+                // Since protocol v2168 the ADD/REMOVE action lives on each entry, not the packet.
                 packet.entries.forEach {
-                    if (add) {
+                    if (it.action == PlayerListPacket.Action.ADD) {
                         playerMap[it.uuid] = it
                     } else {
                         playerMap.remove(it.uuid)

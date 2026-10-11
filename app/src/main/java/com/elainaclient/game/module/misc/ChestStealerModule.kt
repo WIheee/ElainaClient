@@ -228,7 +228,7 @@ class ChestStealerModule : Module("ChestStealer", ModuleCategory.Misc) {
 
         for (containerSlot in container.content.indices) {
             val item = container.content[containerSlot]
-            if (item == null || item == ItemData.AIR || item.count <= 0) continue
+            if (item == ItemData.AIR || item.count <= 0) continue
 
             val priority = getItemPriority(item)
             if (priority > 0) {

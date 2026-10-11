@@ -1,8 +1,5 @@
 package com.elainaclient.overlay.gui.kitsu
 
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
@@ -58,7 +55,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -90,7 +86,9 @@ class KitsuGUI : OverlayWindow() {
                     WindowManager.LayoutParams.FLAG_DIM_BEHIND or
                     WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
             if (Build.VERSION.SDK_INT >= 31) {
-                blurBehindRadius = 20
+                // Full-screen blur-behind is the priciest thing this window composites; a smaller
+                // radius keeps the frosted look while cutting per-frame cost.
+                blurBehindRadius = 12
             }
             layoutInDisplayCutoutMode =
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
@@ -200,38 +198,14 @@ class KitsuGUI : OverlayWindow() {
                 .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(
-                            brush = Brush.linearGradient(
-                                colors = listOf(style.accent, style.accentSecondary)
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_wclient),
-                        contentDescription = "Logo",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = "Elaina",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = style.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+            Text(
+                text = "Elaina",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = style.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
 
             Spacer(Modifier.height(23.dp))
 
@@ -327,19 +301,12 @@ class KitsuGUI : OverlayWindow() {
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        val context = LocalContext.current
-                        ActionButton(style, R.drawable.ic_discord) {
-                            openUrl("https://github.com/WIheee/ElainaClient", context)
-                        }
-                        ActionButton(style, R.drawable.ic_web) {
-                            openUrl("https://github.com/WIheee/ElainaClient", context)
-                        }
-                        ActionButton(style, R.drawable.ic_close, isClose = true, onClick = dismissWithAnimation)
-                    }
+                    ActionButton(
+                        style,
+                        R.drawable.ic_close,
+                        isClose = true,
+                        onClick = dismissWithAnimation
+                    )
                 }
 
                 Spacer(Modifier.height(16.dp))
@@ -415,13 +382,4 @@ class KitsuGUI : OverlayWindow() {
         }
     }
 
-    private fun openUrl(url: String, context: Context) {
-        runCatching {
-            context.startActivity(
-                Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-            )
-        }
-    }
 }

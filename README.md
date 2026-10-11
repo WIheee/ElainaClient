@@ -61,6 +61,10 @@ GPLv3 — see [LICENSE](LICENSE). Redistributed/modified versions must ship thei
 
 - This fork: <https://github.com/WIheee/ElainaClient>
 - Based on the **WClient** project (original authors: Prajwal, RA Legend, Flexy H6X).
+- UI ported from **LuminaCN** (Project Lumina, GPLv3) — the adaptive home shell / dashboard, the Kitsu
+  click-GUI theme, and the in-game notification overlay.
+- The on-screen module list ("ArrayList") uses the Horion-style **HorionArrayList** from
+  **openhal4a** (dev1503).
 - Uses **CloudburstMC/Protocol** (`bedrock-codec` / `bedrock-connection` / `common`) for the Bedrock
   protocol; `relay/Protocol` contains the vendored source (see its `LICENSE`).
 - Xbox/Mojang login via `net.raphimc:MinecraftAuth`.

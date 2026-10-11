@@ -212,10 +212,13 @@ files.
   is the dark **overlay-only** palette — don't reach for it in app UI. `ui/component/WComponents.kt`
   is theme-aware and uses a **static** glow (the per-frame `rememberInfiniteTransition` glow was
   removed for performance — don't reintroduce animated shadows).
-- **Overlay HUD perf**: the `overlay/hud/*` animations are gated so they only tick when needed
-  (`ArrayList`/`Crosshair`/`Coordinates` skip their loop in STATIC colour mode; `WaterMark` runs at
-  ~20 fps). `ArrayListModule` pushes to the overlay only when the enabled set changes, and
-  `ModuleContent`'s list is keyed — keep it that way.
+- **Overlay HUD perf**: `Crosshair`/`Coordinates` skip their 16 ms loop in STATIC colour mode and
+  `WaterMark` runs at ~20 fps. `ArrayListModule` pushes to the overlay only when the enabled set
+  changes, and `ModuleContent`'s list is keyed — keep it that way.
+- The on-screen module list ("ArrayList") HUD is the Horion-style `HorionArrayList` custom View
+  (ported from the `openhal4a` project, under `overlay/hud/horion/`), embedded via `AndroidView` in
+  `ArrayListOverlay`; `ArrayListModule`'s options are mapped onto it. Same for the click-GUI: KITSU
+  is LuminaCN's layout (`overlay/gui/kitsu/`). Both are third-party ports — credit in `README.md`.
 - Removed from this fork: Realms (UI *and* backend), the startup loading screen, and the ad-gate
   (`VerificationManager`/`VerificationDialog`). Don't reintroduce them.
 - The codebase carries unusually long explanatory comments documenting past Bedrock-protocol workarounds

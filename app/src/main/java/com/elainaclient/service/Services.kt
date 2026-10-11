@@ -242,11 +242,8 @@ object Services {
         val params = WindowManager.LayoutParams().apply {
             width = WindowManager.LayoutParams.MATCH_PARENT
             height = WindowManager.LayoutParams.MATCH_PARENT
-            type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            } else {
-                WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
-            }
+            // minSdk is 28 (> Android O), so the application-overlay type is always available.
+            type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or

@@ -120,11 +120,12 @@ abstract class Module(
         if (!isSessionCreated) return
 
         val stateText = if (enabled) "已启用" else "已禁用"
-        val status = (if (enabled) "§a" else "§c") + stateText
+        // Elaina theme violet brand tag instead of the old red; status is green/gray (no red).
+        val status = (if (enabled) "§a" else "§7") + stateText
         val moduleName = name.localizedModule()
 
         session.displayClientMessage(
-            "§l§c[ElainaClient] §r§7$moduleName §8» $status"
+            "§l§d[ElainaClient] §r§7$moduleName §8» $status"
         )
 
         OverlayNotificationManager.show(

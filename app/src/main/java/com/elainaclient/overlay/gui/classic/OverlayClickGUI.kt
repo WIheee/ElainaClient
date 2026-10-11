@@ -1,7 +1,5 @@
 package com.elainaclient.overlay.gui.classic
 
-import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.view.WindowManager
 import androidx.compose.animation.AnimatedContent
@@ -47,7 +45,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -102,7 +99,6 @@ class OverlayClickGUI(
     @OptIn(ExperimentalAnimationApi::class)
     @Composable
     override fun Content() {
-        val context = LocalContext.current
         val snackbarHostState = remember { SnackbarHostState() }
 
         CompositionLocalProvider(LocalClickGuiStyle provides theme.style) {
@@ -125,8 +121,8 @@ class OverlayClickGUI(
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                Color(0xFF0F0A0A),
-                                Color(0xFF121010)
+                                LocalClickGuiStyle.current.cardBackground,
+                                LocalClickGuiStyle.current.cardBackgroundExpanded
                             )
                         ),
                         RoundedCornerShape(20.dp)
@@ -140,22 +136,6 @@ class OverlayClickGUI(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     HeaderBar(
-                        onDiscord = {
-                            context.startActivity(
-                                Intent(
-                                    Intent.ACTION_VIEW,
-                                    Uri.parse("https://discord.gg/N2Gejr8Fbp")
-                                )
-                            )
-                        },
-                        onWebsite = {
-                            context.startActivity(
-                                Intent(
-                                    Intent.ACTION_VIEW,
-                                    Uri.parse("https://wclient.neocities.org/")
-                                )
-                            )
-                        },
                         onClose = { OverlayManager.dismissOverlayWindow(this@OverlayClickGUI) }
                     )
                     MainArea(snackbarHostState)
@@ -174,8 +154,6 @@ class OverlayClickGUI(
 
     @Composable
     private fun HeaderBar(
-        onDiscord: () -> Unit,
-        onWebsite: () -> Unit,
         onClose: () -> Unit
     ) {
         Row(
@@ -199,22 +177,6 @@ class OverlayClickGUI(
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                IconButton(onClick = onDiscord) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_discord),
-                        contentDescription = "Discord",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                IconButton(onClick = onWebsite) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_web),
-                        contentDescription = "Website",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
                 IconButton(onClick = onClose) {
                     Icon(
                         Icons.Rounded.Close,

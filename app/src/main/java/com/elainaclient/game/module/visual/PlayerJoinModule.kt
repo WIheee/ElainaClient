@@ -14,10 +14,11 @@ class PlayerJoinModule : Module("PlayerJoin", ModuleCategory.Visual) {
 
         val packet = interceptablePacket.packet
         if (packet is PlayerListPacket) {
-            when (packet.action) {
-                PlayerListPacket.Action.ADD -> {
-                    for (entry in packet.entries) {
-                        val uuid = entry.uuid.toString()
+            // Since protocol v2168 the ADD/REMOVE action lives on each entry, not on the packet.
+            for (entry in packet.entries) {
+                val uuid = entry.uuid.toString()
+                when (entry.action) {
+                    PlayerListPacket.Action.ADD -> {
                         val name = entry.name?.toString() ?: "Unknown"
                         if (!trackedPlayers.containsKey(uuid)) {
                             trackedPlayers[uuid] = name
@@ -26,17 +27,14 @@ class PlayerJoinModule : Module("PlayerJoin", ModuleCategory.Visual) {
                             }
                         }
                     }
-                }
-                PlayerListPacket.Action.REMOVE -> {
-                    for (entry in packet.entries) {
-                        val uuid = entry.uuid.toString()
+                    PlayerListPacket.Action.REMOVE -> {
                         val name = trackedPlayers.remove(uuid)
                         if (name != null) {
                             session.displayClientMessage("§c[-] §f$name §cleft")
                         }
                     }
+                    else -> Unit
                 }
-                else -> Unit
             }
         }
     }

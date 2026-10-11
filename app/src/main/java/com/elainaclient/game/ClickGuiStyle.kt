@@ -30,12 +30,13 @@ data class ClickGuiStyle(
     val cornerRadius: Float = 20f
 ) {
     companion object {
+        // Classic now uses the Kitsu palette (the old dark-red scheme was dropped).
         val Classic = ClickGuiStyle(
-            accent = Color(0xFFE63946), accentSecondary = Color(0xFFDC2F3E), accentDark = Color(0xFF8B1A1F),
-            background = Color(0xFF0A0A0A), cardBackground = Color(0xFF121212), cardBackgroundExpanded = Color(0xFF1A1212),
-            textPrimary = Color(0xFFE8E8E8), textSecondary = Color(0xFFB0B0B0), textMuted = Color(0xFF666666),
-            border = Color(0xFF2A1A1A), borderActive = Color(0xFF3A2222), errorRed = Color(0xFFCF222E),
-            headerBackground = Color(0xFF161212), sidebarBackground = Color(0xFF1A1212), buttonBackground = Color(0xFF251A1A)
+            accent = Color(0xFF8B7CF6), accentSecondary = Color(0xFF7C6CF0), accentDark = Color(0xFF4B3FA8),
+            background = Color(0xFF14131B), cardBackground = Color(0xFF1B1926), cardBackgroundExpanded = Color(0xFF221F30),
+            textPrimary = Color(0xFFEDEBF5), textSecondary = Color(0xFFA9A3C0), textMuted = Color(0xFF6E6885),
+            border = Color(0xFF2C2940), borderActive = Color(0xFF3B3757), errorRed = Color(0xFFE5484D),
+            headerBackground = Color(0xFF1B1926), sidebarBackground = Color(0xFF1B1926), buttonBackground = Color(0xFF2A2740)
         )
 
         val Kitsu = ClickGuiStyle(

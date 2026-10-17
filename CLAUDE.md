@@ -19,7 +19,7 @@ Note: The game modules here are cheat features (kill aura, flight, ESP, etc.). W
   game-state model. Depends on `:relay`. Most deps come from the version catalog
   (`gradle/libs.versions.toml`), but a few are declared inline in `app/build.gradle.kts`:
   OkHttp, `androidx.browser` (Chrome Custom Tabs, used by `AuthWebView`), and Coil
-  (`coil-compose` + `coil-gif`). `versionName = "18.0"`, `versionCode = 1`.
+  (`coil-compose` + `coil-gif`). `versionName = "B2"`, `versionCode = 2`.
 - `:relay` — plain Kotlin/JVM library (`com.elainaclient.relay`). The proxy engine: RakNet server,
   upstream client, codec negotiation, packet listeners, auth handshake. **No Android SDK dependency** —
   it can't use `android.util.Log`; it logs via `println` (visible in logcat for the app process).
@@ -185,10 +185,14 @@ dark (they sit over the game): `OverlayManager` wraps every overlay's `Content()
 
 **Overlays / click GUI**: `OverlayManager` owns the launcher button, per-module shortcut buttons, and
 the click GUI. The click GUI is skinned by a selectable `GUITheme` (`overlay/GUITheme.kt`: CLASSIC /
-KITSU / GRACE / PROTOHAX). **`KITSU` has its own layout** (`overlay/gui/kitsu/KitsuGUI.kt` +
-`KitsuModuleContent.kt`, ported from LuminaCN-2.1.0's `kitsugui/*`: 660×500 card, logo + category
-sidebar, header link/close buttons, its own module-card renderer). CLASSIC / GRACE / PROTOHAX share the
-classic layout (`overlay/gui/classic/OverlayClickGUI.kt`) re-skinned by palette. `GUITheme.createClickGUI()`
+KITSU / GRACE / PROTOHAX). **KITSU, GRACE and PROTOHAX each have their own layout**, all ported from
+LuminaCN-2.1.0: `overlay/gui/kitsu/` (`kitsugui/*`: 660×500 card, logo + category sidebar, header
+link/close buttons), `overlay/gui/grace/` (`GraceMenuUi`: horizontal animated-gradient rail + 70 dp
+module grid + left-sliding settings panel; layout from Lumina, re-skinned with Elaina's violet
+palette in `GracePalette.kt`), and
+`overlay/gui/protohax/` (`ProtohaxUi`: vertical Material3 rail + expand-in-place module cards). Only
+CLASSIC uses the classic layout (`overlay/gui/classic/OverlayClickGUI.kt`) re-skinned by palette.
+`GUITheme.createClickGUI()`
 (`overlay/gui/GuiThemeProvider.kt`) maps theme → window; `OverlayManager.openClickGUI()` builds it lazily
 and `applyTheme()` re-attaches overlays after a change. Palettes live in `game/ClickGuiStyle.kt` +
 `LocalClickGuiStyle` (CLASSIC's `ModuleContent`/`ConfigurationScreen` read it through `@Composable` colour
@@ -253,9 +257,27 @@ files.
   presets — this is the one `ConnectionManager` uses) and `app/.../util/ServerCompatUtils.kt`
   (operates on a `String` hostname, returns UI-facing connection tips / a `ServerConfigType`).
   Grep the one you actually mean.
-- Companion docs: `PROTOCOL_NOTES.md` (protocol pitfalls + how to upgrade the protocol library),
-  `PLACEMENT_FIX_NOTES.md` (item-placement modules).
-- Placement modules (PistonCrystal/Surround/Scaffold) don't hand-build `ItemUse` transactions: they
-  cache a real outgoing `ITEM_USE` placement from the player and clone it, sanitize the held `ItemData`
-  net-id, rebuild server-authoritative inventory actions, and update local block state immediately.
-  See `PLACEMENT_FIX_NOTES.md` before touching this path.
+- Companion docs: `PROTOCOL_NOTES.md` (protocol pitfalls + how to upgrade the protocol library).
+- **Crystal/placement features were removed** (2026-10-17): Surround, PistonCrystal, CrystalSmash,
+  AntiCrystal, HitAndRun, HotbarSwitcher, FakeDeath, FakeXP and PacketLogger are gone, together with
+  `BlockPlacementUtils`, `PacketDebugLog`, `LocalPlayer.placeBlock` and
+  `Level.findPlacementReference`. This project does not target a crystal playstyle; do not reintroduce
+  them without being asked. The placement seam is **retained but currently unused**:
+  `game/world/BlockPlacer.kt` (+ internal `PlacementRules`, covered by `BlockPlacerTest`) and
+  `game/hotbar/HeldSlot.kt` have **no production caller** — read
+  `docs/adr/0001-block-placement-seam.md` before wiring anything to them.
+  `PLACEMENT_FIX_NOTES.md` is now historical only.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues at WIheee/ElainaClient, driven by the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical triage roles map 1:1 to their default label strings. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.

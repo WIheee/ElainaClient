@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Architecture review — ElainaClient</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .seam { stroke-dasharray: 5 4; }
+      .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+      .shallow { background: repeating-linear-gradient(45deg, #fef3c7, #fef3c7 6px, #fde68a 6px, #fde68a 12px); }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .label { font-size: .625rem; text-transform: uppercase; letter-spacing: .12em; }
+      .arrowline { stroke: #64748b; stroke-width: 1.5; fill: none; }
+      .leakline { stroke: #dc2626; stroke-width: 2; fill: none; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans antialiased">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-14">
+
+      <!-- ============ HEADER ============ -->
+      <header class="border-b border-slate-300 pb-8">
+        <div class="flex items-baseline justify-between flex-wrap gap-4">
+          <h1 class="font-serif text-4xl tracking-tight text-slate-900">Architecture review — ElainaClient</h1>
+          <span class="mono text-xs text-slate-500">2026-10-17</span>
+        </div>
+        <p class="mt-3 text-slate-600 max-w-3xl">
+          66 modules · 23 274 行 app 代码 · 无测试源码目录。审查重点：核心业务逻辑（模块系统、游戏状态、封包流）
+          与最近变更最密集的区域（placement / hotbar / targeting）。
+        </p>
+        <div class="mt-6 flex flex-wrap gap-x-8 gap-y-3 items-center text-xs text-slate-600">
+          <span class="flex items-center gap-2"><span class="inline-block w-8 h-4 border-2 border-slate-700 bg-white"></span> module</span>
+          <span class="flex items-center gap-2"><svg width="34" height="8"><line class="seam" x1="2" y1="4" x2="32" y2="4" stroke="#64748b" stroke-width="2"/></svg> seam</span>
+          <span class="flex items-center gap-2"><svg width="34" height="8"><line class="leakline" x1="2" y1="4" x2="30" y2="4"/><path d="M30 4 l-5 -3 v6 z" fill="#dc2626"/></svg> leakage</span>
+          <span class="flex items-center gap-2"><span class="inline-block w-8 h-4 deep"></span> deep module</span>
+        </div>
+      </header>
+
+      <section id="candidates" class="space-y-16">
+
+        <!-- ============ C1 ============ -->
+        <article id="c1" class="scroll-mt-6">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">Strong</span>
+            <span class="px-2.5 py-0.5 rounded-full text-xs mono bg-slate-100 text-slate-600 border border-slate-300">in-process</span>
+          </div>
+          <h2 class="font-serif text-2xl mt-3">1. 给「放一个方块」一个 seam，并删掉死掉的那个</h2>
+
+          <p class="mono text-xs text-slate-500 mt-2 leading-relaxed">
+            game/entity/LocalPlayer.kt:107–193（placeBlock + clickPositionForFace） ·
+            game/BlockPlacementUtils.kt:48–147 · game/module/combat/SurroundModule.kt:197–230 ·
+            game/module/combat/PistonCrystalModule.kt:334–399 · game/world/Level.kt:513
+          </p>
+
+          <div class="grid md:grid-cols-2 gap-5 mt-6">
+            <!-- BEFORE -->
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="label text-slate-500 mb-3">before — 3 份实现，其中 1 份没人调用</div>
+              <div class="space-y-2">
+                <div class="border-2 border-red-300 bg-red-50 rounded p-2">
+                  <div class="label text-red-700">LocalPlayer.placeBlock <span class="normal-case tracking-normal">— 0 个调用点</span></div>
+                  <div class="mono text-[10px] text-slate-600 mt-1">…blockPosition · blockFace · hotbarSlot<br/>· itemInHand · clickPosition=✨按面随机 · actions…</div>
+                </div>
+                <div class="border-2 border-slate-400 bg-white rounded p-2">
+                  <div class="label text-slate-700">SurroundModule.place</div>
+                  <div class="mono text-[10px] text-slate-600 mt-1">…同样的字段<br/>· clickPosition = <span class="text-red-600 font-bold">(0.5, 0.5, 0.5)</span>…</div>
+                </div>
+                <div class="border-2 border-slate-400 bg-white rounded p-2">
+                  <div class="label text-slate-700">PistonCrystalModule.place</div>
+                  <div class="mono text-[10px] text-slate-600 mt-1">…同样的字段<br/>· clickPosition = <span class="text-red-600 font-bold">(0.5, 0.5, 0.5)</span>…</div>
+                </div>
+                <div class="flex items-center gap-2 pt-1">
+                  <svg width="20" height="14"><line class="leakline" x1="0" y1="7" x2="14" y2="7"/><path d="M14 7 l-4 -3 v6 z" fill="#dc2626"/></svg>
+                  <span class="text-[11px] text-red-700">已静默分叉：声明的 blockFace 与 clickPosition 几何不自洽</span>
+                </div>
+              </div>
+            </div>
+            <!-- AFTER -->
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="label text-slate-500 mb-3">after — 一个深模块</div>
+              <div class="deep rounded p-3 text-slate-100">
+                <div class="label text-emerald-300">BlockPlacer.place(identifier, pos): Boolean</div>
+                <div class="mono text-[10px] text-slate-300 mt-2 leading-relaxed">
+                  邻居搜索 → 分面判断 → clickPosition ← 面 →<br/>
+                  InventoryActionData → 发送 → 可选本地预测<br/>
+                  <span class="text-slate-400">（全部吸收进来）</span>
+                </div>
+              </div>
+              <div class="mt-3 flex items-center gap-3 text-[11px] text-slate-600">
+                <span class="border-2 border-slate-700 px-2 py-1 bg-white rounded mono">Surround</span>
+                <span class="border-2 border-slate-700 px-2 py-1 bg-white rounded mono">PistonCrystal</span>
+                <span class="text-slate-400">↓ 一行</span>
+              </div>
+              <div class="mt-2 text-[11px] text-emerald-700">Level.findPlacementReference 删除（第二份邻居搜索）</div>
+            </div>
+          </div>
+
+          <dl class="mt-5 grid sm:grid-cols-3 gap-4 text-sm">
+            <div><dt class="label text-slate-500">friction</dt><dd class="mt-1 text-slate-700">同一个概念有 3 份实现，唯一正确的那份（按面的 clickPosition）是死代码，两份在用的已经在字段上分叉。</dd></div>
+            <div><dt class="label text-slate-500">change</dt><dd class="mt-1 text-slate-700">把「点击哪个邻居、哪个面、clickPosition 怎么算、actions 怎么填、发不发预测」全部收进一个模块；caller 只给物品与目标坐标。</dd></div>
+            <div><dt class="label text-slate-500">strength</dt><dd class="mt-1 text-slate-700">最近变更最密集处（Surround 25 次、PistonCrystal 22 次提交），delete test 明确：删掉 LocalPlayer.placeBlock 复杂度直接消失。</dd></div>
+          </dl>
+
+          <ul class="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>locality：placement 知识集中在一处</li>
+            <li>删掉一个死模块 + 一个私有无用 helper</li>
+            <li>leverage：两个模块共享一条已验证路径</li>
+            <li>clickPosition 错误只可能有一个来源</li>
+            <li>Level 少一份邻居搜索</li>
+            <li>接口即测试面：可离线断言封包字段</li>
+          </ul>
+        </article>
+
+        <!-- ============ C2 ============ -->
+        <article id="c2" class="scroll-mt-6">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">Strong</span>
+            <span class="px-2.5 py-0.5 rounded-full text-xs mono bg-slate-100 text-slate-600 border border-slate-300">in-process</span>
+          </div>
+          <h2 class="font-serif text-2xl mt-3">2. 把 hotbar 切换的不变量收进一个模块</h2>
+
+          <p class="mono text-xs text-slate-500 mt-2 leading-relaxed">
+            SurroundModule.kt:232–254 · PistonCrystalModule.kt:412–429 · HotbarSwitcherModule.kt:67–73
+          </p>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4 mt-6">
+            <div class="label text-slate-500 mb-3">before — 同一段 20 行，×3；不变量写在注释里，靠交叉引用别的模块</div>
+            <pre class="mermaid">
+flowchart LR
+  S["SurroundModule<br/>switchToSlot()"]
+  P["PistonCrystalModule<br/>switchToSlot()"]
+  H["HotbarSwitcherModule<br/>switchToSlot()"]
+  R["session.serverBound(PlayerHotbarPacket)"]
+  I["inventory.predictHeldItemSlot(slot)"]
+  S -->|"先"| R
+  P -->|"先"| R
+  H -->|"先"| R
+  R -->|"必须再调，否则 heldItemSlot 永不更新"| I
+  S -.->|"注释：见 SurroundModule 的说明"| P
+  classDef dup fill:#fef3c7,stroke:#d97706,stroke-width:2px;
+  classDef leakfill fill:#fff,stroke:#dc2626,stroke-width:2px;
+  class S,P,H dup
+  class I leakfill
+            </pre>
+            <p class="text-[11px] text-slate-600 mt-1">
+              不变量是：<span class="mono">serverBound()</span> 绕过了唯一会更新
+              <span class="mono">heldItemSlot</span> 的拦截管线，所以切换后必须手动
+              <span class="mono">predictHeldItemSlot</span>。这是一条 caller 必须知道的顺序约束 —— 典型的 seam 泄漏。
+            </p>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-5 mt-5">
+            <div class="rounded border border-slate-200 bg-white p-3">
+              <div class="label text-slate-500 mb-2">after</div>
+              <div class="deep rounded p-3 text-slate-100">
+                <div class="label text-emerald-300">GameSession.switchHeldSlot(slot: Int)</div>
+                <div class="mono text-[10px] text-slate-400 mt-2">顺序与预测封在内部，无 caller 需要知道</div>
+              </div>
+              <div class="mono text-[10px] text-slate-500 mt-2">Surround / PistonCrystal / HotbarSwitcher → session.switchHeldSlot(s)</div>
+            </div>
+            <dl class="text-sm space-y-3">
+              <div><dt class="label text-slate-500">friction</dt><dd class="text-slate-700">顺序不变量泄漏到 3 个 caller，且只以注释形式记录在一个模块里。</dd></div>
+              <div><dt class="label text-slate-500">change</dt><dd class="text-slate-700">队列语义由模块拥有；caller 不再需要知道 <span class="mono">serverBound</span> 会绕开管线。</dd></div>
+              <div><dt class="label text-slate-500">win</dt><dd class="text-slate-700">与 C1 同文件，可一并完成；删掉 2 份重复体。</dd></div>
+            </dl>
+          </div>
+        </article>
+
+        <!-- ============ C3 ============ -->
+        <article id="c3" class="scroll-mt-6">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">Strong</span>
+            <span class="px-2.5 py-0.5 rounded-full text-xs mono bg-slate-100 text-slate-600 border border-slate-300">in-process</span>
+          </div>
+          <h2 class="font-serif text-2xl mt-3">3. 一个目标选择模块，而不是 17 个</h2>
+
+          <p class="mono text-xs text-slate-500 mt-2 leading-relaxed">
+            17 modules: combat/{Killaura, WAura, AutoFight, InfiniteAura, EnemyHunter, PistonCrystal,
+            TriggerBot, CrystalSmash, ACA, HitAndRun, Hitbox, AutoHvH} · misc/ChestStealer ·
+            motion/PlayerTP · visual/{ESP, Minimap, TargetHud}
+          </p>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4 mt-6">
+            <div class="label text-slate-500 mb-3">before — 每个模块各写一次「距离 → 非友军 → 非 bot → 排序」</div>
+            <pre class="mermaid">
+flowchart LR
+  M["17 个模块<br/>各自 private fun findTarget / isTarget / isBot"]
+  F["FriendManager"]
+  B["MobList"]
+  E["Level.entityMap"]
+  M --> F
+  M --> B
+  M --> E
+  classDef leakfill fill:#fff,stroke:#dc2626,stroke-width:2px;
+  class M leakfill
+            </pre>
+            <p class="text-[11px] text-slate-600 mt-1">
+              并且各家的过滤条件已经不一致 —— 有的跳过 bot，有的不跳；排序键、范围语义各有差异。
+              「谁是敌人」这条规则没有单一来源。
+            </p>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-5 mt-5">
+            <div class="rounded border border-slate-200 bg-white p-3">
+              <div class="label text-slate-500 mb-2">after</div>
+              <div class="deep rounded p-3 text-slate-100">
+                <div class="label text-emerald-300">TargetSelector.select(range, filter): Entity?</div>
+                <div class="mono text-[10px] text-slate-400 mt-2">距离 · 友军 · bot/mob · 排序 全是内部细节</div>
+              </div>
+            </div>
+            <dl class="text-sm space-y-3">
+              <div><dt class="label text-slate-500">friction</dt><dd class="text-slate-700">同一规则 17 份实现，且已互相漂移；改一次「友军豁免」要改 17 处。</dd></div>
+              <div><dt class="label text-slate-500">change</dt><dd class="text-slate-700">一个带 filter 参数的深接口；特殊模块传谓词，默认路径共享。</dd></div>
+              <div><dt class="label text-slate-500">win</dt><dd class="text-slate-700">locality：目标规则一处定义；leverage：17 个 caller 一份实现。</dd></div>
+            </dl>
+          </div>
+        </article>
+
+        <!-- ============ C4 ============ -->
+        <article id="c4" class="scroll-mt-6">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">Worth exploring</span>
+            <span class="px-2.5 py-0.5 rounded-full text-xs mono bg-slate-100 text-slate-600 border border-slate-300">in-process</span>
+          </div>
+          <h2 class="font-serif text-2xl mt-3">4. 朝向计算绕过了已有的 RotationUtils（3 种约定）</h2>
+
+          <p class="mono text-xs text-slate-500 mt-2 leading-relaxed">
+            game/utils/math/RotationUtils.kt（已存在，正确） ·
+            SurroundModule.kt:105 · PistonCrystalModule.kt:361 · EnemyHunterModule.kt:90–91 ·
+            InfiniteAuraModule.kt:87 · PositionLoggerModule.kt:159
+          </p>
+
+          <div class="grid md:grid-cols-2 gap-5 mt-6">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="label text-slate-500 mb-3">before — 同一个问题，3 种写法</div>
+              <div class="space-y-2 mono text-[10px]">
+                <div class="border-l-4 border-red-400 bg-red-50 p-2 rounded-r">
+                  <div class="text-slate-500">RotationUtils.toRotation（无人调用）</div>
+                  <div class="text-slate-800">deg(atan2(dz, dx)) − 90f</div>
+                </div>
+                <div class="border-l-4 border-amber-400 bg-amber-50 p-2 rounded-r">
+                  <div class="text-slate-500">Surround / PistonCrystal / EnemyHunter</div>
+                  <div class="text-slate-800">deg(atan2(−dx, dz))</div>
+                </div>
+                <div class="border-l-4 border-amber-400 bg-amber-50 p-2 rounded-r">
+                  <div class="text-slate-500">InfiniteAura</div>
+                  <div class="text-slate-800">(deg(atan2(dz, dx)) − 90 + 360) % 360</div>
+                </div>
+                <div class="border-l-4 border-amber-400 bg-amber-50 p-2 rounded-r">
+                  <div class="text-slate-500">PositionLogger</div>
+                  <div class="text-slate-800">deg(atan2(dx, dz))</div>
+                </div>
+              </div>
+              <p class="text-[11px] text-red-700 mt-2">三个 yaw 约定互不相同 —— 不是纯重复，是已经分叉的正确性风险。</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="label text-slate-500 mb-3">after</div>
+              <div class="deep rounded p-3 text-slate-100">
+                <div class="label text-emerald-300">toRotation(from, to) / getAngleDifference</div>
+                <div class="mono text-[10px] text-slate-400 mt-2">单一约定；pitch 一并计算（现在多数模块只算 yaw，pitch 复用 yaw）</div>
+              </div>
+              <dl class="text-sm space-y-2 mt-3">
+                <div><dt class="label text-slate-500">friction</dt><dd class="text-slate-700">已有的 seam 被绕过，5 个 caller 各自实现。</dd></div>
+                <div><dt class="label text-slate-500">change</dt><dd class="text-slate-700">改用 <span class="mono">toRotation</span>；把「假旋转」包成一个小接口。</dd></div>
+                <div><dt class="label text-slate-500">win</dt><dd class="text-slate-700">pitch 不再是 yaw 的复制品；朝向只可能错在一处。</dd></div>
+              </dl>
+            </div>
+          </div>
+          <p class="text-xs text-slate-500 mt-3">与 C3 天然同处一个 seam：选中目标之后立刻要面向它。可以考虑由同一个模块拥有。</p>
+        </article>
+
+        <!-- ============ C5 ============ -->
+        <article id="c5" class="scroll-mt-6">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">Worth exploring</span>
+            <span class="px-2.5 py-0.5 rounded-full text-xs mono bg-slate-100 text-slate-600 border border-slate-300">in-process</span>
+          </div>
+          <h2 class="font-serif text-2xl mt-3">5. 「发一条聊天/文本」有 7 份构造</h2>
+
+          <p class="mono text-xs text-slate-500 mt-2 leading-relaxed">
+            GameSession.kt:291 · util/PacketDebugLog.kt:20–25 · game/ActionBarManager.kt:26–30 ·
+            misc/SpammerModule.kt:88–95 · misc/PacketLoggerModule.kt:66–70 ·
+            misc/PositionLoggerModule.kt:177–181 · world/FreeCameraModule.kt:120–124
+          </p>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4 mt-6">
+            <div class="label text-slate-500 mb-3">before — 7 层薄壳，每层都要知道 TextPacket 的字段名</div>
+            <div class="space-y-1">
+              <div class="shallow border-l-4 border-amber-500 rounded-r h-9 flex items-center px-3 text-[11px] mono">GameSession.displayClientMessage</div>
+              <div class="shallow border-l-4 border-amber-500 rounded-r h-9 flex items-center px-3 text-[11px] mono">PacketDebugLog.log</div>
+              <div class="shallow border-l-4 border-amber-500 rounded-r h-9 flex items-center px-3 text-[11px] mono">ActionBarManager</div>
+              <div class="shallow border-l-4 border-amber-500 rounded-r h-9 flex items-center px-3 text-[11px] mono">SpammerModule</div>
+              <div class="shallow border-l-4 border-amber-500 rounded-r h-9 flex items-center px-3 text-[11px] mono">PacketLoggerModule</div>
+              <div class="shallow border-l-4 border-amber-500 rounded-r h-9 flex items-center px-3 text-[11px] mono">PositionLoggerModule</div>
+              <div class="shallow border-l-4 border-amber-500 rounded-r h-9 flex items-center px-3 text-[11px] mono">FreeCameraModule</div>
+            </div>
+            <div class="mt-3 flex items-center gap-4">
+              <div class="deep rounded h-16 flex-1 flex items-center justify-center">
+                <span class="label text-emerald-300">after — ChatSender：构造 + 方向 + 字段名 全在内部</span>
+              </div>
+            </div>
+            <p class="text-[11px] text-slate-600 mt-2">
+              每个 caller 目前都要知道：<span class="mono">type</span> 设什么、
+              <span class="mono">message</span>/<span class="mono">filteredMessage</span>/<span class="mono">needsTranslation</span>
+              要反射着设、以及要 clientBound 而不是 serverBound。
+            </p>
+          </div>
+
+          <dl class="mt-4 grid sm:grid-cols-3 gap-4 text-sm">
+            <div><dt class="label text-slate-500">friction</dt><dd class="mt-1 text-slate-700">7 份薄壳，接口宽度接近实现宽度。</dd></div>
+            <div><dt class="label text-slate-500">change</dt><dd class="mt-1 text-slate-700">一个 ChatSender 模块；logging / spam / actionbar 都成为它的薄 adapter。</dd></div>
+            <div><dt class="label text-slate-500">win</dt><dd class="mt-1 text-slate-700">字段名只出现一次；「早期消息被吞」的排队逻辑只在一处。</dd></div>
+          </dl>
+        </article>
+
+        <!-- ============ C6 ============ -->
+        <article id="c6" class="scroll-mt-6">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">Worth exploring</span>
+            <span class="px-2.5 py-0.5 rounded-full text-xs mono bg-slate-100 text-slate-600 border border-slate-300">in-process</span>
+          </div>
+          <h2 class="font-serif text-2xl mt-3">6. 协议字段名泄漏进 14 个文件（19 处反射）</h2>
+
+          <p class="mono text-xs text-slate-500 mt-2 leading-relaxed">
+            util/PacketFieldUtil.kt:48 · 19 call sites in 14 files · 8 个字面量字段名
+          </p>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4 mt-6">
+            <div class="label text-slate-500 mb-3">before — caller 必须知道 cloudburst 的私有字段叫什么</div>
+            <pre class="mermaid">
+flowchart LR
+  subgraph callers["callers（14 个文件）"]
+    A["Killaura"]:::leak
+    B["EnemyHunter"]:::leak
+    C["ACAModule"]:::leak
+    D["AutoHvH"]:::leak
+    E["PlayerTP"]:::leak
+    F["PacketDebugLog"]:::leak
+    G["Spammer"]:::leak
+  end
+  U["setPacketField(&quot;onGround&quot;, false)"]:::leak
+  V["setPacketField(&quot;message&quot;, …)"]:::leak
+  W["setPacketField(&quot;needsTranslation&quot;, …)"]:::leak
+  A --> U
+  B --> U
+  C --> U
+  D --> U
+  E --> U
+  F --> V
+  G --> V
+  G --> W
+  classDef leak fill:#fff,stroke:#dc2626,stroke-width:2px;
+            </pre>
+            <p class="text-[11px] text-slate-600 mt-1">
+              字面量：<span class="mono">onGround ×7 · message ×6 · needsTranslation ×4 · filteredMessage · text · kickMessage · selectHotbarSlot</span>。
+              库升级改名 → 19 处静默失败（反射失败不抛）。
+            </p>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-5 mt-5">
+            <div class="rounded border border-slate-200 bg-white p-3">
+              <div class="label text-slate-500 mb-2">after</div>
+              <div class="deep rounded p-3 text-slate-100">
+                <div class="label text-emerald-300">typed accessors，一个模块拥有全部字段名</div>
+                <div class="mono text-[10px] text-slate-300 mt-2">val PlayerAuthInputPacket.onGround: Boolean</div>
+                <div class="mono text-[10px] text-slate-400">fun TextPacket.withMessage(text: String)</div>
+              </div>
+              <div class="mono text-[10px] text-slate-500 mt-2">caller 侧：packet.onGround = false（不再有字符串）</div>
+            </div>
+            <dl class="text-sm space-y-3">
+              <div><dt class="label text-slate-500">friction</dt><dd class="text-slate-700">协议依赖的私有细节泄漏到 14 个文件，且失败是静默的。</dd></div>
+              <div><dt class="label text-slate-500">change</dt><dd class="text-slate-700">字符串字段名集中到一处，对外是类型化属性/方法。</dd></div>
+              <div><dt class="label text-slate-500">win</dt><dd class="text-slate-700">库升级只需改一个文件；漏改会编译失败而非静默。</dd></div>
+            </dl>
+          </div>
+          <p class="text-xs text-amber-700 mt-3">注意：这与 <span class="mono">PROTOCOL_NOTES.md</span> 记录的「新 cloudburst 去掉了公开 setter」是同一根因 —— 这个模块就是那层适配的归属地。</p>
+        </article>
+
+        <!-- ============ C7 ============ -->
+        <article id="c7" class="scroll-mt-6">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">Worth exploring</span>
+            <span class="px-2.5 py-0.5 rounded-full text-xs mono bg-slate-100 text-slate-600 border border-slate-300">in-process</span>
+          </div>
+          <h2 class="font-serif text-2xl mt-3">7. 拆开 Level：551 行里住着 8 个职责</h2>
+
+          <p class="mono text-xs text-slate-500 mt-2 leading-relaxed">
+            game/world/Level.kt:34–550 · game/GameSession.kt:21–325
+          </p>
+
+          <div class="grid md:grid-cols-2 gap-5 mt-6">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="label text-slate-500 mb-3">before — 一个类，八件事</div>
+              <div class="border-2 border-slate-700 rounded overflow-hidden">
+                <div class="bg-slate-800 text-white label px-3 py-1">Level</div>
+                <div class="divide-y divide-slate-200">
+                  <div class="px-3 py-1.5 text-[11px] bg-amber-50">实体追踪 entityMap / playerMap / Entity*Packet</div>
+                  <div class="px-3 py-1.5 text-[11px] bg-amber-50">三种区块加载协议 LevelChunk / SubChunk / UpdateBlock</div>
+                  <div class="px-3 py-1.5 text-[11px] bg-amber-50">blob 缓存重组 pendingCacheBlobs</div>
+                  <div class="px-3 py-1.5 text-[11px] bg-red-50 text-red-800">诊断计数器与聊天输出 ×4</div>
+                  <div class="px-3 py-1.5 text-[11px] bg-amber-50">世界高度 / 维度判定 + 方法反射</div>
+                  <div class="px-3 py-1.5 text-[11px] bg-amber-50">爆炸伤害模拟 simulateExplosionDamage</div>
+                  <div class="px-3 py-1.5 text-[11px] bg-amber-50">方块读写 get/setBlockIdAt</div>
+                  <div class="px-3 py-1.5 text-[11px] bg-red-50 text-red-800">放置参考点搜索（与 C1 重复）</div>
+                </div>
+              </div>
+              <p class="text-[11px] text-slate-600 mt-2">几乎每个模块都依赖它 → 任何一处改动都要跑一遍全量回归。</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="label text-slate-500 mb-3">after — 沿调用者的用法切</div>
+              <div class="space-y-2">
+                <div class="border-2 border-slate-700 rounded p-2">
+                  <div class="label text-slate-700">Level（实体状态）</div>
+                  <div class="mono text-[10px] text-slate-500">entityMap · playerMap · onPacketBound</div>
+                </div>
+                <div class="border-2 border-slate-700 rounded p-2">
+                  <div class="label text-slate-700">BlockStore（方块读写）</div>
+                  <div class="mono text-[10px] text-slate-500">getBlockAt · setBlockIdAt · isAir · 放置参考点</div>
+                </div>
+                <div class="border-2 border-slate-700 rounded p-2">
+                  <div class="label text-slate-700">ChunkDecoder（三种协议 + blob）</div>
+                  <div class="mono text-[10px] text-slate-500">decode(packet): Chunk? · pendingCacheBlobs</div>
+                </div>
+                <div class="border-2 border-slate-700 rounded p-2">
+                  <div class="label text-slate-700">WorldGeometry（高度 / 维度）</div>
+                  <div class="mono text-[10px] text-slate-500">is384WorldSupported · dimensionOf(packet)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <dl class="mt-5 grid sm:grid-cols-3 gap-4 text-sm">
+            <div><dt class="label text-slate-500">friction</dt><dd class="mt-1 text-slate-700">区块解码这类「纯函数」逻辑与实体状态、诊断、几何判定混在一起，无法单独测试。</dd></div>
+            <div><dt class="label text-slate-500">change</dt><dd class="mt-1 text-slate-700">沿调用者真实用法切四个 seam；Level 变为组合它们的薄层。</dd></div>
+            <div><dt class="label text-slate-500">win</dt><dd class="mt-1 text-slate-700">ChunkDecoder 可对喂入的字节直接测试 —— 这是当前最不可测的一块（区块数据长期出问题）。</dd></div>
+          </dl>
+          <p class="text-xs text-slate-500 mt-3">⚠️ 最大的候选，也最容易做砸。建议等 C1/C8 落地、Level 的职责面被削薄之后再动。</p>
+        </article>
+
+        <!-- ============ C8 ============ -->
+        <article id="c8" class="scroll-mt-6">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">Worth exploring</span>
+            <span class="px-2.5 py-0.5 rounded-full text-xs mono bg-slate-100 text-slate-600 border border-slate-300">in-process</span>
+          </div>
+          <h2 class="font-serif text-2xl mt-3">8. 诊断脚手架从业务逻辑里搬出去</h2>
+
+          <p class="mono text-xs text-slate-500 mt-2 leading-relaxed">
+            Level.kt:66–67,136–144,187–211,261–267,300–304,360–362 ·
+            GameSession.kt:55–67,96–129 · SurroundModule.kt:50,83–98
+          </p>
+
+          <div class="grid md:grid-cols-2 gap-5 mt-6">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="label text-slate-500 mb-3">before — 计数器住在业务类里</div>
+              <div class="mono text-[10px] space-y-1">
+                <div class="rounded bg-red-50 border-l-4 border-red-400 px-2 py-1.5">Level: levelChunkDiagCount, levelChunkParseCheckCount, subChunkDiagCount</div>
+                <div class="rounded bg-red-50 border-l-4 border-red-400 px-2 py-1.5">GameSession: pendingDiagnostics, earlyPacketDiagCount, pendingDiagnosticsFlushed</div>
+                <div class="rounded bg-red-50 border-l-4 border-red-400 px-2 py-1.5">SurroundModule: surroundDiagTickCounter, lastWarnedMessage</div>
+                <div class="rounded bg-amber-50 border-l-4 border-amber-400 px-2 py-1.5">全部无条件生效，没有 debug 开关</div>
+              </div>
+              <p class="text-[11px] text-slate-600 mt-2">每 40 tick 一次 <span class="mono">[SurroundDiag]</span> 会把 5 个方向的方块 id 拼进聊天 —— 线上也会发。</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="label text-slate-500 mb-3">after</div>
+              <div class="deep rounded p-3 text-slate-100">
+                <div class="label text-emerald-300">Diagnostics（一个开关 + 一个输出口）</div>
+                <div class="mono text-[10px] text-slate-300 mt-2">if (Diagnostics.chunk) report("…")</div>
+              </div>
+              <dl class="text-sm space-y-2 mt-3">
+                <div><dt class="label text-slate-500">friction</dt><dd class="text-slate-700">临时代码成为永久代码；业务类被计数器污染。</dd></div>
+                <div><dt class="label text-slate-500">change</dt><dd class="text-slate-700">诊断由 flag 控制，输出走与 C5 同一个 ChatSender。</dd></div>
+                <div><dt class="label text-slate-500">win</dt><dd class="text-slate-700">Level/GameSession 少 8 个状态字段；线上不再刷屏。</dd></div>
+              </dl>
+            </div>
+          </div>
+        </article>
+
+        <!-- ============ C9 ============ -->
+        <article id="c9" class="scroll-mt-6">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">Worth exploring</span>
+            <span class="px-2.5 py-0.5 rounded-full text-xs mono bg-slate-100 text-slate-600 border border-slate-300">local-substitutable</span>
+          </div>
+          <h2 class="font-serif text-2xl mt-3">9. 配置读写：四条循环变一条</h2>
+
+          <p class="mono text-xs text-slate-500 mt-2 leading-relaxed">
+            game/ModuleManager.kt:171–193（save） · 195–226（load） · 228–240（export） ·
+            242–257（import） · 259–276（file） · 303–314（uri）
+          </p>
+
+          <div class="grid md:grid-cols-2 gap-5 mt-6">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="label text-slate-500 mb-3">before — 同一个遍历写四遍</div>
+              <div class="grid grid-cols-2 gap-2 mono text-[10px]">
+                <div class="border-2 border-slate-400 rounded p-2 bg-white">
+                  <div class="label text-slate-600">save</div>
+                  <div class="text-slate-500 mt-1">_modules.forEach { if (private) return; put(name, toJson()) }</div>
+                </div>
+                <div class="border-2 border-slate-400 rounded p-2 bg-white">
+                  <div class="label text-slate-600">export</div>
+                  <div class="text-slate-500 mt-1">_modules.forEach { if (private) return; put(name, toJson()) }</div>
+                </div>
+                <div class="border-2 border-slate-400 rounded p-2 bg-white">
+                  <div class="label text-slate-600">load</div>
+                  <div class="text-slate-500 mt-1">_modules.forEach { modules[name]?.let { fromJson(it) } }</div>
+                </div>
+                <div class="border-2 border-slate-400 rounded p-2 bg-white">
+                  <div class="label text-slate-600">import</div>
+                  <div class="text-slate-500 mt-1">_modules.forEach { modules[name]?.let { fromJson(it) } }</div>
+                </div>
+              </div>
+              <svg width="100%" height="34" class="mt-2">
+                <line class="arrowline" x1="25%" y1="4" x2="50%" y2="14"/>
+                <line class="arrowline" x1="75%" y1="4" x2="50%" y2="14"/>
+                <line class="arrowline" x1="25%" y1="30" x2="50%" y2="20"/>
+                <line class="arrowline" x1="75%" y1="30" x2="50%" y2="20"/>
+              </svg>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="label text-slate-500 mb-3">after</div>
+              <div class="deep rounded p-3 text-slate-100">
+                <div class="label text-emerald-300">ModuleConfig.toJson() / applyFrom(json)</div>
+                <div class="mono text-[10px] text-slate-400 mt-2">private 过滤与遍历只在内部一次</div>
+              </div>
+              <div class="mt-3 space-y-1.5">
+                <div class="text-[11px] text-slate-700 mono">save   → 写 filesDir 的 adapter</div>
+                <div class="text-[11px] text-slate-700 mono">export → 返回 String 的 adapter</div>
+                <div class="text-[11px] text-slate-700 mono">import → 接 String 的 adapter</div>
+                <div class="text-[11px] text-slate-700 mono">uri    → 接 InputStream 的 adapter</div>
+              </div>
+              <p class="text-[11px] text-emerald-700 mt-2">两个以上 adapter → 这是真 seam，不是假设的。</p>
+            </div>
+          </div>
+          <p class="text-xs text-slate-500 mt-3">顺带：<span class="mono">load</span> 静默吞异常、<span class="mono">import</span> 抛 <span class="mono">IllegalArgumentException</span>、<span class="mono">importConfigFromFile</span> 又返回 Boolean —— 三种错误语义并存。</p>
+        </article>
+
+        <!-- ============ C10 ============ -->
+        <article id="c10" class="scroll-mt-6">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700 border border-slate-300">Speculative</span>
+            <span class="px-2.5 py-0.5 rounded-full text-xs mono bg-slate-100 text-slate-600 border border-slate-300">in-process</span>
+          </div>
+          <h2 class="font-serif text-2xl mt-3">10. 66 个 import 的注册表</h2>
+
+          <p class="mono text-xs text-slate-500 mt-2 leading-relaxed">
+            game/ModuleManager.kt:7–71（66 个 import） · 90–169（66 次 add） · game/ModuleNames.kt:15+
+          </p>
+
+          <div class="grid md:grid-cols-2 gap-5 mt-6">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="label text-slate-500 mb-3">before</div>
+              <div class="mono text-[10px] text-slate-500 leading-relaxed">
+                import …ACAModule<br/>
+                import …AntiCrystalModule<br/>
+                import … <span class="text-slate-400">（还有 64 行）</span><br/>
+                <br/>
+                init { with(_modules) {<br/>
+                &nbsp;&nbsp;add(WAuraModule())<br/>
+                &nbsp;&nbsp;add(HotbarSwitcherModule())<br/>
+                &nbsp;&nbsp;<span class="text-slate-400">（还有 64 次）</span><br/>
+                } }
+              </div>
+              <p class="text-[11px] text-slate-600 mt-2">注册一个模块 = 改 1 个模块文件 + 改这里 2 处（+ 可选 ModuleNames）。</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="label text-slate-500 mb-3">after（但有代价）</div>
+              <div class="space-y-2 text-[11px]">
+                <div class="border-l-4 border-slate-400 bg-slate-50 px-2 py-1.5">
+                  <span class="label text-slate-600">方案 A</span> — 反射扫描 <span class="mono">Module</span> 子类
+                  <div class="text-red-700 mt-0.5">R8 fullMode 需要 keep 规则；当前 release 是 minify + shrink</div>
+                </div>
+                <div class="border-l-4 border-slate-400 bg-slate-50 px-2 py-1.5">
+                  <span class="label text-slate-600">方案 B</span> — 按 category 拆成 5 个注册模块
+                  <div class="text-slate-600 mt-0.5">import 少一半，注册点仍在，但 locality 更好</div>
+                </div>
+              </div>
+              <dl class="text-sm space-y-2 mt-3">
+                <div><dt class="label text-slate-500">deletion test</dt><dd class="text-slate-700">删掉 <span class="mono">ModuleManager.modules</span> → 复杂度扩散到 66 个 caller。它该留。<b class="font-normal">但注册表这个形状该改。</b></dd></div>
+                <div><dt class="label text-slate-500">why speculative</dt><dd class="text-slate-700">两个方案都有真实代价（混淆 vs. 渐进收益），不值得在大重构中途做。</dd></div>
+              </dl>
+            </div>
+          </div>
+        </article>
+
+        <!-- ============ C11 ============ -->
+        <article id="c11" class="scroll-mt-6">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">Worth exploring</span>
+            <span class="px-2.5 py-0.5 rounded-full text-xs mono bg-slate-100 text-slate-600 border border-slate-300">in-process</span>
+          </div>
+          <h2 class="font-serif text-2xl mt-3">11. 同一份设置界面渲染了两遍</h2>
+
+          <p class="mono text-xs text-slate-500 mt-2 leading-relaxed">
+            game/ModuleContent.kt:203–459（486 行） · overlay/gui/kitsu/KitsuModuleContent.kt:218–395（454 行） ·
+            game/ClickGuiStyle.kt:34–49
+          </p>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4 mt-6">
+            <div class="label text-slate-500 mb-3">before — 两份渲染器 + 两份调色板（只差一个 cornerRadius）</div>
+            <div class="grid md:grid-cols-2 gap-4">
+              <div class="border-2 border-slate-400 rounded p-3">
+                <div class="label text-slate-600">ModuleContent（CLASSIC / GRACE / PROTOHAX）</div>
+                <div class="mono text-[10px] text-slate-500 mt-2">
+                  Value&lt;*&gt; 列表遍历 · localizedOption ×8<br/>
+                  bool / float / int / enum / list 分支<br/>
+                  cornerRadius=4
+                </div>
+              </div>
+              <div class="border-2 border-slate-400 rounded p-3">
+                <div class="label text-slate-600">KitsuModuleContent（KITSU）</div>
+                <div class="mono text-[10px] text-slate-500 mt-2">
+                  Value&lt;*&gt; 列表遍历 · localizedOption ×8<br/>
+                  bool / float / int / enum / list 分支<br/>
+                  <span class="text-red-600">cornerRadius=8</span>
+                </div>
+              </div>
+            </div>
+            <div class="mt-3 flex items-center gap-2">
+              <svg width="20" height="14"><line class="leakline" x1="0" y1="7" x2="14" y2="7"/><path d="M14 7 l-4 -3 v6 z" fill="#dc2626"/></svg>
+              <span class="text-[11px] text-red-700">
+                ClickGuiStyle.Classic 与 .Kitsu 逐字节相同，只有 cornerRadius 不同 —— 重复被伪装成了数据。
+              </span>
+            </div>
+          </div>
+
+          <dl class="mt-5 grid sm:grid-cols-3 gap-4 text-sm">
+            <div><dt class="label text-slate-500">friction</dt><dd class="mt-1 text-slate-700">同一种 Value&lt;*&gt; 渲染两遍；新增一种设置类型要改两个文件。</dd></div>
+            <div><dt class="label text-slate-500">change</dt><dd class="mt-1 text-slate-700">一个渲染器 + 一个样式参数；主题退化为调色板。</dd></div>
+            <div><dt class="label text-slate-500">win</dt><dd class="mt-1 text-slate-700">少 ~450 行；新 GUI 主题不再需要复制渲染逻辑。</dd></div>
+          </dl>
+          <p class="text-xs text-slate-500 mt-3">属 UI 层，优先级低于 1–6。KITSU 是第三方移植，改动前先确认与上游的对应关系。</p>
+        </article>
+
+      </section>
+
+      <!-- ============ TOP RECOMMENDATION ============ -->
+      <section id="top-recommendation">
+        <div class="deep rounded-xl p-8 text-slate-100">
+          <div class="label text-emerald-300">top recommendation</div>
+          <h2 class="font-serif text-3xl mt-2">先做 <a href="#c1" class="underline decoration-emerald-400 decoration-2 underline-offset-4">#1 方块放置的 seam</a></h2>
+          <p class="mt-4 text-slate-300 max-w-3xl leading-relaxed">
+            这是最近变更最密集的逻辑（Surround 25 次提交、PistonCrystal 22 次），也是最清楚的一处
+            friction：同一个概念三份实现、唯一正确的一份是死代码、两份在用的已经静默分叉。
+            它同时满足三个条件 —— 有死代码可以删、有真实 bug 可以消、有明确的 delete-test 结论。
+            <span class="mono text-slate-400">Level.findPlacementReference</span> 那份重复的邻居搜索也随之消失。
+          </p>
+          <div class="mt-6 grid sm:grid-cols-3 gap-6 text-sm">
+            <div>
+              <div class="label text-slate-400">顺带完成</div>
+              <div class="mt-1 text-slate-200">C2（hotbar 切换）在同一批文件里，几乎是机械操作。</div>
+            </div>
+            <div>
+              <div class="label text-slate-400">紧随其后</div>
+              <div class="mt-1 text-slate-200">C3 / C4 覆盖 17 + 5 个模块，收益面最宽。</div>
+            </div>
+            <div>
+              <div class="label text-slate-400">最后再动</div>
+              <div class="mt-1 text-slate-200">C7（拆 Level）。等 C1 / C8 把 Level 削薄之后再做。</div>
+            </div>
+          </div>
+        </div>
+
+        <p class="mt-6 text-xs text-slate-500">
+          本次审查未创建任何仓库内文件；报告位于系统临时目录。词汇遵循 codebase-design 的
+          module / interface / depth / seam / adapter / leverage / locality。
+          仓库尚无 <span class="mono">GLOSSARY.md</span> 与 <span class="mono">docs/adr/</span> —— 定下术语后再落盘。
+        </p>
+      </section>
+
+    </main>
+  </body>
+</html>

@@ -5,6 +5,7 @@ import com.elainaclient.relay.address.WAddress
 import com.elainaclient.relay.address.inetSocketAddress
 import com.elainaclient.relay.client.ClientIdentification
 import com.elainaclient.relay.config.EnhancedServerConfig
+import com.elainaclient.relay.util.RelayLog
 import com.elainaclient.relay.util.ServerCompatUtils
 import io.netty.bootstrap.Bootstrap
 import io.netty.channel.Channel
@@ -53,6 +54,7 @@ class ConnectionManager(
     ): Result<WRelaySession.ClientSession> = withContext(Dispatchers.IO) {
         
         if (isConnecting) {
+            RelayLog.log("NET", "Upstream connect skipped: already connecting")
             return@withContext Result.failure(IllegalStateException("Already connecting to a server"))
         }
         
@@ -62,7 +64,12 @@ class ConnectionManager(
             val isProtected = ServerCompatUtils.isProtectedServer(remoteAddress)
             val config = if (isProtected) serverConfig else EnhancedServerConfig.FAST
             
-            println("Connecting to ${remoteAddress.hostName}:${remoteAddress.port} (Protected: $isProtected)")
+            RelayLog.log(
+                "NET",
+                "Connecting to ${remoteAddress.hostName}:${remoteAddress.port} " +
+                    "(protected=$isProtected, config=${config.javaClass.simpleName}, " +
+                    "maxAttempts=${config.maxRetryAttempts}, timeout=${config.connectionTimeout}ms)"
+            )
 
             if (isProtected && config.enableConnectionThrottling) {
                 applyConnectionThrottling(remoteAddress.hostName, config)
@@ -77,23 +84,24 @@ class ConnectionManager(
             
             for (attempt in 0 until config.maxRetryAttempts) {
                 try {
-                    println("Connection attempt ${attempt + 1}/${config.maxRetryAttempts}")
-                    
+                    RelayLog.log("NET", "Connection attempt ${attempt + 1}/${config.maxRetryAttempts}")
+
                     val clientSession = attemptConnection(remoteAddress, config, onSessionCreated)
-                    println("Successfully connected to ${remoteAddress.hostName}:${remoteAddress.port}")
+                    RelayLog.log("NET", "Successfully connected to ${remoteAddress.hostName}:${remoteAddress.port}")
                     return@withContext Result.success(clientSession)
-                    
+
                 } catch (e: Exception) {
                     lastException = e
-                    println("Connection attempt ${attempt + 1} failed: ${e.message}")
+                    RelayLog.log("NET", "Connection attempt ${attempt + 1} failed: ${e.message}")
 
                     if (shouldNotRetry(e)) {
+                        RelayLog.log("NET", "Not retrying after: ${e.message}")
                         break
                     }
 
                     if (attempt < config.maxRetryAttempts - 1) {
                         val retryDelay = config.calculateRetryDelay(attempt)
-                        println("Retrying in ${retryDelay}ms...")
+                        RelayLog.log("NET", "Retrying in ${retryDelay}ms...")
                         delay(retryDelay)
                     }
                 }
@@ -204,6 +212,11 @@ class ConnectionManager(
         val timeoutJob = CoroutineScope(Dispatchers.IO).launch {
             delay(config.connectionTimeout + 10000)
             if (!continuation.isCompleted) {
+                RelayLog.log(
+                    "NET",
+                    "Connection timeout after ${config.connectionTimeout}ms to " +
+                        "${remoteAddress.hostName}:${remoteAddress.port} (no RakNet response)"
+                )
                 connectFuture.cancel(true)
                 continuation.resumeWithException(Exception("Connection timeout after ${config.connectionTimeout}ms"))
             }

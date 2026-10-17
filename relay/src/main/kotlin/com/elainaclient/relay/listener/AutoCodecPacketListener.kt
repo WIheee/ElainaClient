@@ -4,6 +4,7 @@ import com.elainaclient.relay.WRelaySession
 import com.elainaclient.relay.codec.CodecRegistry
 import com.elainaclient.relay.codec.VersionDetector
 import com.elainaclient.relay.definition.Definitions
+import com.elainaclient.relay.util.RelayLog
 import org.cloudburstmc.protocol.bedrock.codec.BedrockCodec
 import org.cloudburstmc.protocol.bedrock.codec.v729.serializer.InventoryContentSerializer_v729
 import org.cloudburstmc.protocol.bedrock.codec.v729.serializer.InventorySlotSerializer_v729
@@ -25,15 +26,13 @@ class AutoCodecPacketListener(
             val minecraftVersion = CodecRegistry.getMinecraftVersion(codec.protocolVersion)
             val supportedVersions = VersionDetector.getSupportedVersionsForProtocol(codec.protocolVersion)
             
-            println("Selected codec for protocol $protocolVersion:")
-            println("  - Codec protocol: ${codec.protocolVersion}")
-            println("  - Minecraft version: ${codec.minecraftVersion}")
-            if (minecraftVersion != null) {
-                println("  - Primary version: $minecraftVersion")
-            }
-            if (supportedVersions.isNotEmpty()) {
-                println("  - Supported versions: ${supportedVersions.joinToString(", ")}")
-            }
+            RelayLog.log(
+                "NET",
+                "Codec for client protocol $protocolVersion -> codec protocol ${codec.protocolVersion}, " +
+                    "MC ${codec.minecraftVersion}" +
+                    (minecraftVersion?.let { ", primary $it" } ?: "") +
+                    (if (supportedVersions.isNotEmpty()) ", supported ${supportedVersions.joinToString(", ")}" else "")
+            )
             
             return codec
         }
@@ -56,7 +55,7 @@ class AutoCodecPacketListener(
             try {
                 val protocolVersion = packet.protocolVersion
                 val bedrockCodec = patchCodecIfNeeded(fetchCodecForProtocol(protocolVersion))
-                println("Using bedrock codec: ${bedrockCodec.protocolVersion} for client protocol: $protocolVersion")
+                RelayLog.log("NET", "Using codec ${bedrockCodec.protocolVersion} for client protocol $protocolVersion")
 
                 wRelaySession.server.codec = bedrockCodec
                 wRelaySession.server.peer.codecHelper.apply {

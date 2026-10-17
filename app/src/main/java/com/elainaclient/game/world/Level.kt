@@ -491,46 +491,16 @@ class Level(val session: GameSession) {
         chunk.setBlockAt(x and 0x0f, y, z and 0x0f, runtimeId)
     }
 
+    /**
+     * Block-identity check against our own world model.
+     *
+     * Deliberately kept although nothing calls it right now: it belongs to Level's block-read
+     * surface, and the planned Level split (architecture-review candidate C7) moves block reads
+     * into their own module, which will want it. Not marked @Deprecated for that reason.
+     */
     fun isAir(x: Int, y: Int, z: Int): Boolean = getBlockAt(x, y, z).identifier == "minecraft:air"
 
     fun isAir(pos: Vector3i): Boolean = isAir(pos.x, pos.y, pos.z)
-
-    /**
-     * Bedrock places a new block adjacent to whatever *existing* block you "click" - not directly
-     * at the position you name - so block-placing modules (Surround, PistonCrystal, ...) need to
-     * find a real, currently non-air neighbor of [pos] to click, and which face of that neighbor
-     * points back at [pos]. Checks straight down first (the common "place on the ground" case),
-     * then up, then the four horizontal neighbors.
-     *
-     * Returns null if [pos] itself isn't currently air (already occupied, or the chunk/subchunk
-     * simply isn't tracked yet - see the LevelChunkPacket/ClientCacheMissResponsePacket handling
-     * notes above for the ways that can happen) or if none of its neighbors are known to be
-     * solid, e.g. floating in open air.
-     *
-     * @return (position of the block to click, Bedrock face index of that block to click:
-     *   0=down,1=up,2=north,3=south,4=west,5=east) or null
-     */
-    fun findPlacementReference(pos: Vector3i): Pair<Vector3i, Int>? {
-        if (!isAir(pos)) return null
-
-        // (offset to the neighboring block, face of THAT block which points back at pos)
-        val candidates = listOf(
-            Vector3i.from(0, -1, 0) to 1, // below   -> click its UP face
-            Vector3i.from(0, 1, 0) to 0,  // above   -> click its DOWN face
-            Vector3i.from(1, 0, 0) to 4,  // east    -> click its WEST face
-            Vector3i.from(-1, 0, 0) to 5, // west    -> click its EAST face
-            Vector3i.from(0, 0, 1) to 2,  // south   -> click its NORTH face
-            Vector3i.from(0, 0, -1) to 3  // north   -> click its SOUTH face
-        )
-
-        for ((offset, face) in candidates) {
-            val neighborPos = Vector3i.from(pos.x + offset.x, pos.y + offset.y, pos.z + offset.z)
-            if (!isAir(neighborPos)) {
-                return neighborPos to face
-            }
-        }
-        return null
-    }
 
     /** Tries each candidate no-arg method name in order, returning the first one that exists and returns an Int. */
     private fun readIntPropertyViaReflection(target: Any, candidates: List<String>): Int? {

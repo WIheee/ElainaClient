@@ -2,6 +2,7 @@ package com.elainaclient.relay.listener
 
 import com.elainaclient.relay.WRelaySession
 import com.elainaclient.relay.util.AuthUtils
+import com.elainaclient.relay.util.RelayLog
 import net.kyori.adventure.text.Component
 import net.raphimc.minecraftauth.bedrock.BedrockAuthManager
 import org.cloudburstmc.protocol.bedrock.data.PacketCompressionAlgorithm
@@ -28,7 +29,7 @@ class OnlineLoginPacketListener(
 
     override fun beforeClientBound(packet: BedrockPacket): Boolean {
         if (packet is LoginPacket) {
-            println("Processing login packet")
+            RelayLog.log("NET", "Game client sent LoginPacket - refreshing account session")
 
             try {
                 // BedrockAuthManager refreshes its own tokens on demand - calling getUpToDate()
@@ -36,7 +37,7 @@ class OnlineLoginPacketListener(
                 // to the login flow, instead of failing partway through connectServer().
                 authManager.minecraftCertificateChain.getUpToDate()
             } catch (e: Exception) {
-                println("Failed to refresh session: ${e.message}")
+                RelayLog.log("NET", "Account session refresh FAILED: ${e.message}")
                 e.printStackTrace()
                 wRelaySession.server.disconnect("Your session has expired and could not be refreshed. Please re-login in the W Client.")
                 return true
@@ -49,7 +50,7 @@ class OnlineLoginPacketListener(
                 skinData = JSONObject(JsonUtil.parseJson(jws.unverifiedPayload))
                 connectServer()
             } catch (e: Exception) {
-                println("Failed to process login packet: ${e.message}")
+                RelayLog.log("NET", "Failed to process LoginPacket: ${e.message}")
                 e.printStackTrace()
                 wRelaySession.server.disconnect("Failed to process login: ${e.message}")
                 return true
@@ -87,9 +88,9 @@ class OnlineLoginPacketListener(
                 loginPacket.clientJwt = skinData
                 wRelaySession.serverBoundImmediately(loginPacket)
 
-                println("Login packet sent successfully")
+                RelayLog.log("NET", "Forwarded login to upstream server")
             } catch (e: Throwable) {
-                println("Login failed: ${e.message}")
+                RelayLog.log("NET", "Upstream login FAILED: ${e.message}")
                 e.printStackTrace()
                 wRelaySession.server.disconnect("Authentication failed: ${e.message}")
                 return true
@@ -123,7 +124,7 @@ class OnlineLoginPacketListener(
                 )
 
                 wRelaySession.client!!.enableEncryption(key)
-                println("Encryption enabled successfully")
+                RelayLog.log("NET", "Upstream encryption enabled")
 
                 wRelaySession.serverBoundImmediately(ClientToServerHandshakePacket())
             } catch (e: Exception) {
@@ -140,20 +141,20 @@ class OnlineLoginPacketListener(
     private fun connectServer() {
         try {
             wRelaySession.wRelay.connectToServer {
-                println("Connected to server, sending network settings request")
+                RelayLog.log("NET", "Upstream session ready - sending network settings request")
 
                 try {
                     val packet = RequestNetworkSettingsPacket()
                     packet.protocolVersion = wRelaySession.negotiatedProtocolVersion()
                     wRelaySession.serverBoundImmediately(packet)
-                    println("Network settings request sent")
+                    RelayLog.log("NET", "Network settings request sent")
                 } catch (e: Exception) {
                     println("Failed to send network settings request: ${e.message}")
                     e.printStackTrace()
                 }
             }
         } catch (e: Exception) {
-            println("Failed to connect to server: ${e.message}")
+            RelayLog.log("NET", "Failed to start upstream connect: ${e.message}")
             e.printStackTrace()
             wRelaySession.server.disconnect("Failed to connect to server: ${e.message}")
         }

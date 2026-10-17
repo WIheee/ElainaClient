@@ -6,6 +6,7 @@ import com.elainaclient.relay.address.inetSocketAddress
 import com.elainaclient.relay.codec.CodecRegistry
 import com.elainaclient.relay.config.EnhancedServerConfig
 import com.elainaclient.relay.connection.ConnectionManager
+import com.elainaclient.relay.util.RelayLog
 import com.elainaclient.relay.util.ServerCompatUtils
 import io.netty.bootstrap.ServerBootstrap
 import io.netty.channel.Channel
@@ -102,6 +103,7 @@ class WRelay(
             .childHandler(object : BedrockChannelInitializer<WRelaySession.ServerSession>() {
 
                 override fun createSession0(peer: BedrockPeer, subClientId: Int): WRelaySession.ServerSession {
+                    RelayLog.log("NET", "Game client connected (subClientId=$subClientId)")
                     return WRelaySession(peer, subClientId, this@WRelay)
                         .also {
                             wRelaySession = it
@@ -127,9 +129,21 @@ class WRelay(
             .localAddress(localAddress.inetSocketAddress)
             .bind()
             .awaitUninterruptibly()
-            .also {
-                it.channel().pipeline().remove(RakServerRateLimiter.NAME)
-                channelFuture = it
+            .let { bindFuture ->
+                // Binding used to be silent: a failed bind left a dead channel stored as if the
+                // relay were running, so the game client simply couldn't connect and nothing said
+                // why. Log the outcome, and only treat a *successful* bind as "running" so a
+                // retry is possible (e.g. the port was still held by a previous session).
+                if (bindFuture.isSuccess) {
+                    bindFuture.channel().pipeline().remove(RakServerRateLimiter.NAME)
+                    channelFuture = bindFuture
+                    RelayLog.log("NET", "Listening on ${localAddress.hostName}:${localAddress.port}")
+                } else {
+                    RelayLog.log(
+                        "NET",
+                        "BIND FAILED on ${localAddress.hostName}:${localAddress.port}: ${bindFuture.cause()}"
+                    )
+                }
             }
 
         return this
@@ -139,10 +153,13 @@ class WRelay(
         val manager = connectionManager ?: throw IllegalStateException("Connection manager not initialized")
         val address = remoteAddress ?: throw IllegalStateException("Remote address not set")
 
+        RelayLog.log("NET", "Dialing upstream ${address.hostName}:${address.port}")
+
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val result = manager.connectToServer(address, onSessionCreated)
                 if (result.isFailure) {
+                    RelayLog.log("NET", "Upstream connect FAILED: ${result.exceptionOrNull()?.message}")
                     println("Failed to connect to server: ${result.exceptionOrNull()?.message}")
                     result.exceptionOrNull()?.printStackTrace()
                     wRelaySession?.server?.disconnect("Failed to connect to server: ${result.exceptionOrNull()?.message}")
@@ -153,6 +170,7 @@ class WRelay(
                     }
                 }
             } catch (e: Exception) {
+                RelayLog.log("NET", "Upstream connect ERROR: ${e.message}")
                 println("Error during connection: ${e.message}")
                 e.printStackTrace()
                 wRelaySession?.server?.disconnect("Connection error: ${e.message}")

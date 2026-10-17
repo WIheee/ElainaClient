@@ -5,11 +5,8 @@ import android.net.Uri
 import android.os.Environment
 import com.elainaclient.application.AppContext
 import com.elainaclient.game.module.combat.ACAModule
-import com.elainaclient.game.module.combat.AntiCrystalModule
 import com.elainaclient.game.module.combat.AntiKnockbackModule
-import com.elainaclient.game.module.combat.CrystalSmashModule
 import com.elainaclient.game.module.combat.EnemyHunterModule
-import com.elainaclient.game.module.combat.HitAndRunModule
 import com.elainaclient.game.module.combat.HitboxModule
 import com.elainaclient.game.module.combat.KillauraModule
 import com.elainaclient.game.module.combat.TriggerBotModule
@@ -17,22 +14,16 @@ import com.elainaclient.game.module.combat.WAuraModule
 import com.elainaclient.game.module.combat.AutoFightModule
 import com.elainaclient.game.module.combat.AutoHvHModule
 import com.elainaclient.game.module.combat.AutoTotemModule
-import com.elainaclient.game.module.combat.HotbarSwitcherModule
 import com.elainaclient.game.module.combat.InfiniteAuraModule
-import com.elainaclient.game.module.combat.PistonCrystalModule
-import com.elainaclient.game.module.combat.SurroundModule
 import com.elainaclient.game.module.misc.ArrayListModule
 import com.elainaclient.game.module.motion.NoClipModule
 import com.elainaclient.game.module.misc.AutoDisconnectModule
 import com.elainaclient.game.module.misc.CommandHandlerModule
 import com.elainaclient.game.module.visual.CoordinatesModule
 import com.elainaclient.game.module.misc.DesyncModule
-import com.elainaclient.game.module.misc.FakeDeathModule
-import com.elainaclient.game.module.misc.FakeXPModule
 import com.elainaclient.game.module.misc.MinerModule
 import com.elainaclient.game.module.misc.NoChatModule
 import com.elainaclient.game.module.misc.PieChartModule
-import com.elainaclient.game.module.misc.PacketLoggerModule
 import com.elainaclient.game.module.misc.PositionLoggerModule
 import com.elainaclient.game.module.misc.ReplayModule
 import com.elainaclient.game.module.misc.ChestStealerModule
@@ -91,7 +82,6 @@ object ModuleManager {
         with(_modules) {
             // Combat
             add(WAuraModule())
-            add(HotbarSwitcherModule())
             add(KillauraModule())
             add(AutoFightModule())
             add(InfiniteAuraModule())
@@ -101,12 +91,7 @@ object ModuleManager {
             add(EnemyHunterModule())
             add(AntiKnockbackModule())
 
-            add(AntiCrystalModule())
-            add(SurroundModule())
-            add(PistonCrystalModule())
-            add(HitAndRunModule())
             add(HitboxModule())
-            add(CrystalSmashModule())
             add(TriggerBotModule())
 
             // Motion
@@ -157,13 +142,10 @@ object ModuleManager {
             add(SpammerModule())
             add(WaterMarkModule())
             add(PositionLoggerModule())
-            add(PacketLoggerModule())
             add(NoChatModule())
             add(CommandHandlerModule())
             add(ReplayModule())
             add(PieChartModule())
-            add(FakeDeathModule())
-            add(FakeXPModule())
             add(MinerModule())
         }
     }

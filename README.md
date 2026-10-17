@@ -28,7 +28,8 @@ Per-module settings, the enabled set and shortcuts persist as JSON (`UserConfig.
   dashboard for the account, target game, server and service status.
 - **Light / dark** — follows the system by default, with a manual 系统 / 浅色 / 深色 override in
   Settings. In-game overlays stay dark (they sit over the game).
-- **Click-GUI themes** — Classic / Kitsu / Grace / Protohax, selectable in Settings.
+- **Click-GUI themes** — Classic / Kitsu / Grace / Protohax, selectable in Settings. Kitsu, Grace and
+  Protohax each have their own layout (ported from LuminaCN); Grace uses Elaina's violet palette.
 - **Module list HUD** — a Horion-style on-screen list of enabled modules (rainbow/category colours,
   outline/edge styles, adjustable size & spacing, optional Minecraft font).
 - **In-game notifications** — non-intrusive top-centre toasts for module toggles and other events.
@@ -52,8 +53,9 @@ Requirements: **JDK 21**, Android SDK (compileSdk 36). The Gradle wrapper is inc
 - `:relay` — the proxy engine (RakNet server, upstream client, codec negotiation, packet
   listeners, auth handshake). Plain Kotlin/JVM, no Android SDK dependency.
 
-See `CLAUDE.md` for an architecture overview, `PROTOCOL_NOTES.md` for protocol/codec details and how
-to bump the Bedrock protocol version, and `PLACEMENT_FIX_NOTES.md` for the item-placement modules.
+See `CLAUDE.md` for an architecture overview and `PROTOCOL_NOTES.md` for protocol/codec details and
+how to bump the Bedrock protocol version. `PLACEMENT_FIX_NOTES.md` is historical only — the
+crystal/placement modules it described were removed.
 
 ## License
 
@@ -63,8 +65,8 @@ GPLv3 — see [LICENSE](LICENSE). Redistributed/modified versions must ship thei
 
 - This fork: <https://github.com/WIheee/ElainaClient>
 - Based on the **WClient** project (original authors: Prajwal, RA Legend, Flexy H6X).
-- UI ported from **LuminaCN** (Project Lumina, GPLv3) — the adaptive home shell / dashboard, the Kitsu
-  click-GUI theme, and the in-game notification overlay.
+- UI ported from **LuminaCN** (Project Lumina, GPLv3) — the adaptive home shell / dashboard, the
+  Kitsu / Grace / Protohax click-GUI layouts, and the in-game notification overlay.
 - The on-screen module list ("ArrayList") uses the Horion-style **HorionArrayList** from
   **openhal4a** (dev1503).
 - Uses **CloudburstMC/Protocol** (`bedrock-codec` / `bedrock-connection` / `common`) for the Bedrock
@@ -81,6 +83,7 @@ Thanks to the open-source projects this app is built on (each under its own lice
 - [MinecraftAuth](https://github.com/RaphiMC/MinecraftAuth) (RaphiMC) · [jose4j](https://bitbucket.org/b_c/jose4j)
 
 **Android / UI**
+- **LuminaCN** (Project Lumina) — home shell and click-GUI layouts
 - [AndroidX](https://developer.android.com/jetpack/androidx) & [Jetpack Compose](https://developer.android.com/jetpack/compose) (incl. Material 3, Navigation, Lifecycle, Activity)
 - [Kotlin](https://kotlinlang.org) · [kotlinx.coroutines](https://github.com/Kotlin/kotlinx.coroutines) · [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization)
 - [OkHttp](https://square.github.io/okhttp/) (Square) · [Coil](https://github.com/coil-kt/coil) · [androidx.browser](https://developer.android.com/jetpack/androidx/releases/browser) (Chrome Custom Tabs)

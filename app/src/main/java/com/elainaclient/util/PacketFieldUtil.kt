@@ -4,16 +4,20 @@ import java.lang.reflect.Field
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Some packet classes in newer versions of org.cloudburstmc.protocol (e.g. the
- * 3.0.0.Beta12-SNAPSHOT build used to support current Bedrock protocol versions)
- * no longer expose public setters for certain fields (onGround, selectHotbarSlot,
- * needsTranslation, text, etc). The underlying fields still exist, they're just
- * no longer part of the public Java Bean API, which breaks Kotlin's synthetic
- * property assignment (`packet.onGround = true`).
+ * Some packet classes in org.cloudburstmc.protocol no longer expose public setters for certain
+ * fields. The underlying fields still exist, they're just no longer part of the public Java Bean
+ * API, which breaks Kotlin's synthetic property assignment (`packet.onGround = true`).
  *
- * This helper sets those fields directly via reflection so callers don't have to
- * care whether a given field is still publicly settable in the version of the
- * protocol library that's currently linked.
+ * This helper sets those fields directly via reflection so callers don't have to care whether a
+ * given field is still publicly settable in the version of the protocol library that's currently
+ * linked.
+ *
+ * NOTE: which fields are affected is per-field and varies between library versions - do not treat
+ * any list of them as authoritative. An earlier revision of this comment claimed `selectHotbarSlot`
+ * was one of them; that is wrong for the linked build, where `PlayerHotbarPacket.isSelectHotbarSlot
+ * = true` compiles fine (Lombok `@Data` generates `setSelectHotbarSlot` - verified against the
+ * reference source in relay/Protocol, see ADR-0001). Prefer the plain property assignment wherever
+ * it compiles, and reach for this helper only where it doesn't.
  */
 object PacketFieldUtil {
 

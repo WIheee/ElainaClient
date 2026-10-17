@@ -76,8 +76,8 @@ class GameSession(val wRelaySession: WRelaySession) : ComposedPacketHandler {
 
     // ComposedPacketHandler's default beforeClientBound()/beforeServerBound() both just call
     // this single method, so modules previously had no way to tell which direction a packet
-    // was going (e.g. AntiCrystalModule rewriting position needs to only touch outgoing/
-    // server-bound packets, not incoming ones). We now override beforeClientBound/
+    // was going (e.g. a module rewriting a position needs to touch only outgoing/server-bound
+    // packets, not incoming ones). We now override beforeClientBound/
     // beforeServerBound below instead, so this is only kept to satisfy the interface and
     // defaults to treating the packet as server-bound if anything else ends up calling it
     // directly.

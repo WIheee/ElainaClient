@@ -1,6 +1,7 @@
 package com.elainaclient.relay
 
 import com.elainaclient.relay.listener.WRelayPacketListener
+import com.elainaclient.relay.util.RelayLog
 import io.netty.util.internal.PlatformDependent
 import net.kyori.adventure.text.Component
 import org.cloudburstmc.protocol.bedrock.BedrockClientSession
@@ -52,6 +53,10 @@ class WRelaySession internal constructor(
         internal set(value) {
             value?.let { session ->
                 try {
+                    val codecSummary = negotiatedCodec
+                        ?.let { "yes, protocol ${it.protocolVersion}" }
+                        ?: "no"
+                    RelayLog.log("NET", "Upstream client session created (codec negotiated: $codecSummary)")
                     val codec = negotiatedCodec
                     if (codec == null) {
                         println("Client session created before codec negotiation; skipping codec setup")
@@ -80,7 +85,7 @@ class WRelaySession internal constructor(
                         }
                     }
                     if (processedCount > 0) {
-                        println("Processed $processedCount queued packets")
+                        RelayLog.log("NET", "Flushed $processedCount packets queued before the upstream existed")
                     }
                 } catch (e: Exception) {
                     println("Failed to initialize client session: ${e.message}")
@@ -149,7 +154,7 @@ class WRelaySession internal constructor(
         init {
             packetHandler = object : BedrockPacketHandler {
                 override fun onDisconnect(reason: CharSequence) {
-                    println("Client disconnect: $reason")
+                    RelayLog.log("NET", "Game client disconnected: $reason")
                     runCatching {
                         client?.disconnect()
                     }
@@ -208,7 +213,7 @@ class WRelaySession internal constructor(
             packetHandler = object : BedrockPacketHandler {
 
                 override fun onDisconnect(reason: CharSequence) {
-                    println("Server disconnect: $reason")
+                    RelayLog.log("NET", "Upstream server disconnected: $reason")
                     runCatching {
                         server.disconnect(reason.toString())
                     }
@@ -229,7 +234,10 @@ class WRelaySession internal constructor(
                 // silently, so "server rejected us" is visible in the log next time.
                 val incoming = wrapper.packet
                 if (incoming is DisconnectPacket) {
-                    println("Upstream DisconnectPacket: reason=${incoming.reason} kickMessage=${incoming.kickMessage}")
+                    RelayLog.log(
+                        "NET",
+                        "Upstream DisconnectPacket: reason=${incoming.reason} kickMessage=${incoming.kickMessage}"
+                    )
                 }
 
                 listeners.forEach { listener ->

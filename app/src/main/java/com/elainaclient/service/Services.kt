@@ -27,6 +27,7 @@ import com.elainaclient.relay.listener.AutoCodecPacketListener
 import com.elainaclient.relay.listener.GamingPacketHandler
 import com.elainaclient.relay.listener.OnlineLoginPacketListener
 import com.elainaclient.relay.util.captureGamePacket
+import com.elainaclient.util.NetLog
 import com.elainaclient.util.ServerCompatUtils
 import java.io.File
 import kotlin.concurrent.thread
@@ -48,6 +49,15 @@ object Services {
 
     fun toggle(context: Context, captureModeModel: CaptureModeModel) {
         if (!isActive) {
+            // The upstream connection is only ever initiated by OnlineLoginPacketListener, which
+            // is installed only when an account is selected (see `on` below). Without one the
+            // relay would accept the game client and then never dial the real server at all: the
+            // client sits on "connecting" forever and the server records zero connections, with
+            // no explanation anywhere. Refuse to start and say why.
+            if (AccountManager.selectedAccount == null) {
+                context.toast("请先在「账号」页选择账号：未选择账号时无法连接真实服务器")
+                return
+            }
             on(context, captureModeModel)
             return
         }
@@ -101,6 +111,9 @@ object Services {
 
         File(context.cacheDir, "token_cache.json")
 
+        NetLog.start(context)
+        NetLog.log("NET", "Service starting")
+
         isActive = true
         handler.post {
             OverlayManager.show(context)
@@ -137,7 +150,24 @@ object Services {
                 )
 
                 val serverConfig = getServerConfig(captureModeModel)
-                wRelay = if (captureModeModel.isProtectedServer() && captureModeModel.enableServerOptimizations) {
+                val useEnhancedRelay =
+                    captureModeModel.isProtectedServer() && captureModeModel.enableServerOptimizations
+
+                NetLog.log(
+                    "NET",
+                    "Relay target ${remoteAddress.hostName}:${remoteAddress.port} " +
+                        "(account=${selectedAccount?.displayName ?: "<NONE>"}, " +
+                        "enhanced=$useEnhancedRelay, " +
+                        "optimizations=${captureModeModel.enableServerOptimizations})"
+                )
+                if (selectedAccount == null) {
+                    NetLog.log(
+                        "NET",
+                        "WARNING: no account selected - nothing will ever dial the upstream server"
+                    )
+                }
+
+                wRelay = if (useEnhancedRelay) {
                     WRelay(
                         localAddress = WAddress("0.0.0.0", 19132),
                         serverConfig = serverConfig
@@ -162,6 +192,7 @@ object Services {
                 }
             }.exceptionOrNull()?.let {
                 it.printStackTrace()
+                NetLog.log("NET", "Start WRelay error: ${it.javaClass.simpleName}: ${it.message}")
                 context.toast("Start WRelay error: ${it.message}")
             }
         }
@@ -210,6 +241,8 @@ object Services {
             thread?.interrupt()
             thread = null
 
+            NetLog.log("NET", "Service stopped")
+            NetLog.stop()
             Log.d("Services", "WRelay service stopped and cleaned up")
         }
     }
@@ -233,6 +266,7 @@ object Services {
         for (module in ModuleManager.modules) {
             module.session = session
         }
+        NetLog.log("NET", "Session initialized: ${ModuleManager.modules.size} modules attached")
         Log.e("Services", "Init session")
     }
 

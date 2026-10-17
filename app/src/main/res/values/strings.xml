@@ -58,7 +58,16 @@
     <string name="shortcut">快捷方式</string>
     <string name="check_updates_and_news">查看更新与新闻</string>
     <string name="crash_happened">发生了崩溃。</string>
-    <string name="cannot_back">应用遇到问题，需要重新启动。</string>
+    <string name="crash_subtitle">应用遇到了未处理的错误</string>
+    <string name="crash_description">完整日志已自动保存，你可以复制或分享给开发者。</string>
+    <string name="crash_stack_trace_label">堆栈信息</string>
+    <string name="crash_log_saved">日志已保存到</string>
+    <string name="crash_restart">重启</string>
+    <string name="crash_copy_log">复制</string>
+    <string name="crash_share_log">分享</string>
+    <string name="crash_share_title">分享崩溃日志</string>
+    <string name="crash_copied">崩溃日志已复制</string>
+    <string name="crash_share_failed">无法分享日志</string>
     <string name="login_in">使用 %s 登录</string>
     <string name="fetch_account_successfully">成功获取账号。</string>
     <string name="xbox_device_code">Xbox 设备代码</string>

@@ -1,12 +1,15 @@
 package com.elainaclient.router.main
 
 import android.content.Context
+import android.content.Intent
+import android.content.pm.ApplicationInfo
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.Opacity
 import androidx.compose.material.icons.rounded.Palette
@@ -24,12 +27,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import com.elainaclient.R
+import com.elainaclient.activity.CrashHandlerActivity
+import com.elainaclient.application.AppContext
 import com.elainaclient.game.ModuleManager
 import com.elainaclient.overlay.GUITheme
 import com.elainaclient.overlay.OverlayManager
 import com.elainaclient.ui.theme.AppTheme
 import com.elainaclient.ui.theme.ThemeMode
 import com.elainaclient.util.LocalSnackbarHostState
+import com.elainaclient.util.LogPaths
 import com.elainaclient.util.SnackbarHostStateScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -258,6 +264,90 @@ fun SettingsPageContent() {
                             }
                             Spacer(Modifier.width(8.dp))
                             Text(if (isExporting) "导出中…" else "导出配置")
+                        }
+                    }
+                }
+
+                // Developer-only tests. Hidden in non-debuggable builds so release users never see
+                // a button that deliberately crashes the app.
+                val isDebuggable =
+                    (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+                if (isDebuggable) {
+                    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier.padding(15.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(15.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Rounded.BugReport,
+                                    null,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Column(Modifier.weight(1f)) {
+                                    Text("开发者测试", style = MaterialTheme.typography.bodyLarge)
+                                    Text(
+                                        "仅调试版本可见，用于验证日志与报错页",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            FilledTonalButton(
+                                onClick = {
+                                    val stack = "java.lang.RuntimeException: simulated developer crash\n" +
+                                        "\tat com.elainaclient.router.main.SettingsPageContent(SettingsPage.kt:1)"
+                                    val time = SimpleDateFormat(
+                                        "yyyy-MM-dd HH:mm:ss",
+                                        Locale.getDefault()
+                                    ).format(Date())
+                                    val report = buildString {
+                                        appendLine("===== ElainaClient developer test report =====")
+                                        appendLine("Simulated crash from Settings.")
+                                        appendLine("Time: $time")
+                                        appendLine()
+                                        appendLine(stack)
+                                    }
+                                    val file = runCatching {
+                                        val directory = LogPaths.app(context)
+                                        directory.mkdirs()
+                                        File(directory, "developer-test.log").apply {
+                                            writeText(report)
+                                        }
+                                    }.getOrNull()
+                                    context.startActivity(
+                                        Intent(context, CrashHandlerActivity::class.java).apply {
+                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                            putExtra(AppContext.EXTRA_MESSAGE, report)
+                                            putExtra(AppContext.EXTRA_STACK_TRACE, stack)
+                                            putExtra(AppContext.EXTRA_LOG_PATH, file?.absolutePath)
+                                        }
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("打开崩溃页（模拟）")
+                            }
+
+                            Button(
+                                onClick = {
+                                    throw RuntimeException(
+                                        "Developer test: crash from Settings"
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            ) {
+                                Text("触发真实崩溃（会重启 App）")
+                            }
                         }
                     }
                 }

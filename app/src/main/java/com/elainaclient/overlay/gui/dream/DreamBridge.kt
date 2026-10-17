@@ -129,7 +129,6 @@ object DreamBridge {
         is ListValue -> value.value.name.localizedOption()
         is BoolValue -> if (value.value) "开" else "关"
         is StringValue -> value.value
-        else -> value.value.toString()
     }
 
     // =========================================================================================

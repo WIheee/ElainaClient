@@ -175,6 +175,27 @@ private fun LicenseSection() {
                     }
                 }
             }
+
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "第三方组件",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = WColors.Secondary
+                )
+                Surface(
+                    color = WColors.Secondary.copy(alpha = 0.08f),
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text(
+                        text = "本项目使用 GPL-3.0、LGPL-3.0、LGPL-2.1、Apache-2.0 与 MIT " +
+                            "许可的开源组件，均遵循各自许可证。完整清单与仓库地址见项目根目录的 " +
+                            "THIRD_PARTY_NOTICES.md。Minecraft 字体与游戏数据不属于 GPLv3。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -284,6 +305,13 @@ private fun 致谢Section(context: android.content.Context) {
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 ContributorItem(
+                    name = "WIheee",
+                    description = "核心贡献者",
+                    githubUrl = "https://github.com/WIheee",
+                    context = context
+                )
+
+                ContributorItem(
                     name = "一剪沐橙",
                     description = "核心贡献者",
                     githubUrl = "https://github.com/mucute-qwq",
@@ -298,15 +326,23 @@ private fun 致谢Section(context: android.content.Context) {
                 )
 
                 ContributorItem(
-                    name = "LiquidBounce / CCBlueX",
-                    description = "Scaffold 模块算法参考（仅算法与逻辑，未复制代码）",
-                    githubUrl = "https://github.com/CCBlueX/LiquidBounce",
+                    name = "WClient",
+                    description = "上游项目（GPL-3.0；Prajwal / RA Legend / Flexy H6X）",
+                    githubUrl = "https://github.com/RetrivedMods/WClient",
+                    context = context
+                )
+
+                ContributorItem(
+                    name = "Lumina / LuminaCN",
+                    description = "主界面、Kitsu/Grace/Protohax 布局与通知悬浮层（GPL-3.0）",
+                    githubUrl = "https://github.com/TheProjectLumina/LuminaClient",
                     context = context
                 )
 
                 ContributorItem(
                     name = "OpenClickGUI / OpenMoxel",
-                    description = "Dream / HackAI / Pianaixel / PixelSight / LiquidPE 界面参考与重构",
+                    description = "Dream / HackAI / Pianaixel / PixelSight / LiquidPE 界面参考与重构" +
+                        "（README 声明开源可修改；上游无标准 LICENSE 文件）",
                     githubUrl = "https://github.com/OpenMoxel/OpenClickGUI",
                     context = context
                 )
@@ -315,6 +351,55 @@ private fun 致谢Section(context: android.content.Context) {
                     name = "LiquidPE",
                     description = "特别感谢：保留原版配色与 Minecraft 字体移植（作者 atlasca3@gmail.com）",
                     githubUrl = null,
+                    context = context
+                )
+
+                ContributorItem(
+                    name = "LiquidBounce / CCBlueX",
+                    description = "Scaffold 模块算法参考（GPL-3.0；仅算法与逻辑，未复制代码）",
+                    githubUrl = "https://github.com/CCBlueX/LiquidBounce",
+                    context = context
+                )
+
+                ContributorItem(
+                    name = "openhal4a / 1503Dev",
+                    description = "HorionArrayList 模块列表（LGPL-2.1）",
+                    githubUrl = "https://github.com/1503Dev/openhal4a",
+                    context = context
+                )
+
+                ContributorItem(
+                    name = "CloudburstMC / Protocol",
+                    description = "Bedrock 协议编解码与连接（Apache-2.0）",
+                    githubUrl = "https://github.com/CloudburstMC/Protocol",
+                    context = context
+                )
+
+                ContributorItem(
+                    name = "CloudburstMC / Network",
+                    description = "RakNet / Query / RCON（Apache-2.0）",
+                    githubUrl = "https://github.com/CloudburstMC/Network",
+                    context = context
+                )
+
+                ContributorItem(
+                    name = "MinecraftAuth / RaphiMC",
+                    description = "Xbox / Mojang 登录（LGPL-3.0）",
+                    githubUrl = "https://github.com/RaphiMC/MinecraftAuth",
+                    context = context
+                )
+
+                ContributorItem(
+                    name = "Kotlin / Jetpack Compose / AndroidX",
+                    description = "开发语言与 UI 框架（Apache-2.0）",
+                    githubUrl = "https://github.com/JetBrains/kotlin",
+                    context = context
+                )
+
+                ContributorItem(
+                    name = "完整第三方许可证清单",
+                    description = "版本、许可证与仓库地址（THIRD_PARTY_NOTICES.md）",
+                    githubUrl = "https://github.com/WIheee/ElainaClient/blob/main/THIRD_PARTY_NOTICES.md",
                     context = context
                 )
             }

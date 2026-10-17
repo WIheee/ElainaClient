@@ -156,7 +156,6 @@ object HackAiBridge {
         }
 
         is StringValue -> value.value
-        else -> value.value.toString()
     }
 
     fun formatNumber(value: Float, step: Float): String =

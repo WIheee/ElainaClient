@@ -162,7 +162,14 @@ class WRelay(
                     RelayLog.log("NET", "Upstream connect FAILED: ${result.exceptionOrNull()?.message}")
                     println("Failed to connect to server: ${result.exceptionOrNull()?.message}")
                     result.exceptionOrNull()?.printStackTrace()
-                    wRelaySession?.server?.disconnect("Failed to connect to server: ${result.exceptionOrNull()?.message}")
+                    // The game client may already have closed (user backed out, timeout). Disconnect
+                    // throws IllegalStateException("Session has been closed") in that case, and
+                    // letting it escape this coroutine crashes the app.
+                    runCatching {
+                        wRelaySession?.server?.disconnect("Failed to connect to server: ${result.exceptionOrNull()?.message}")
+                    }.onFailure {
+                        RelayLog.log("NET", "Game client already closed: ${it.message}")
+                    }
                     wRelaySession?.listeners?.forEach { listener ->
                         runCatching {
                             listener.onDisconnect("Connection failed: ${result.exceptionOrNull()?.message}")
@@ -173,7 +180,11 @@ class WRelay(
                 RelayLog.log("NET", "Upstream connect ERROR: ${e.message}")
                 println("Error during connection: ${e.message}")
                 e.printStackTrace()
-                wRelaySession?.server?.disconnect("Connection error: ${e.message}")
+                runCatching {
+                    wRelaySession?.server?.disconnect("Connection error: ${e.message}")
+                }.onFailure {
+                    RelayLog.log("NET", "Game client already closed: ${it.message}")
+                }
             }
         }
     }

@@ -37,6 +37,7 @@
     <string name="server">服务器</string>
     <string name="about">关于</string>
     <string name="settings">设置</string>
+    <string name="ui_settings">界面</string>
     <string name="how_do_i_switch_login_mode">如何切换登录模式？</string>
     <string name="login_mode_introduction">想使用在线模式登录，就添加一个账号并选中它；想使用离线模式，则取消选中账号。</string>
     <string name="combat">战斗</string>

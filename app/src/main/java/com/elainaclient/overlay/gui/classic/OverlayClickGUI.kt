@@ -45,6 +45,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -57,6 +59,7 @@ import com.elainaclient.game.ModuleContent
 import com.elainaclient.overlay.GUITheme
 import com.elainaclient.overlay.OverlayManager
 import com.elainaclient.overlay.OverlayWindow
+import com.elainaclient.overlay.UISettings
 
 private val DarkBackground: Color
     @Composable get() = LocalClickGuiStyle.current.background
@@ -79,6 +82,8 @@ class OverlayClickGUI(
     private val theme: GUITheme = GUITheme.CLASSIC
 ) : OverlayWindow() {
 
+    override val immersive: Boolean get() = true
+
     private val _layoutParams by lazy {
         super.layoutParams.apply {
             flags = flags or WindowManager.LayoutParams.FLAG_DIM_BEHIND
@@ -99,6 +104,8 @@ class OverlayClickGUI(
     @OptIn(ExperimentalAnimationApi::class)
     @Composable
     override fun Content() {
+        val context = LocalContext.current
+        val uiScale = remember(theme) { UISettings.scale(context, theme) }
         val snackbarHostState = remember { SnackbarHostState() }
 
         CompositionLocalProvider(LocalClickGuiStyle provides theme.style) {
@@ -118,6 +125,7 @@ class OverlayClickGUI(
                 modifier = Modifier
                     .width(600.dp)
                     .height(340.dp)
+                    .graphicsLayer(scaleX = uiScale, scaleY = uiScale)
                     .background(
                         Brush.verticalGradient(
                             listOf(

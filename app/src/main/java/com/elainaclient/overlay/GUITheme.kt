@@ -14,7 +14,15 @@ enum class GUITheme(
     CLASSIC("经典", ClickGuiStyle.Classic),
     KITSU("Kitsu", ClickGuiStyle.Kitsu),
     GRACE("Grace", ClickGuiStyle.Grace),
-    PROTOHAX("Protohax", ClickGuiStyle.Protohax);
+    PROTOHAX("Protohax", ClickGuiStyle.Protohax),
+
+    // Ported from OpenMoxel/OpenClickGUI. The first four are re-skinned with Elaina's palette;
+    // LIQUIDPE deliberately keeps its original LiquidBounce colours and Minecraft font.
+    DREAM("Dream", ClickGuiStyle.Dream),
+    HACKAI("HackAI", ClickGuiStyle.HackAi),
+    PIANAIXEL("Pianaixel", ClickGuiStyle.Pianaixel),
+    PIXELSIGHT("PixelSight", ClickGuiStyle.PixelSight),
+    LIQUIDPE("LiquidPE", ClickGuiStyle.LiquidPe);
 
     companion object {
         const val PREF_KEY = "gui_theme"

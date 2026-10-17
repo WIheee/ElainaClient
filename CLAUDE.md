@@ -125,6 +125,13 @@ shortcut buttons, the click GUI, the notification toasts, and the HUD/ESP overla
   `filesDir/configs/UserConfig.json` (external export goes to `Documents/ElainaClient/configs`).
 - `ComposedPacketHandler` / `InterruptiblePacketHandler` — the module packet hooks. `beforePacketBound`
   returns whether to swallow; `afterPacketBound`/`onDisconnect` are optional.
+- **Packet rewrites need interception.** `WRelaySession` forwards the *raw* packet buffer, so mutating
+  the decoded packet in a listener does **not** change what the server receives. To send a modified
+  packet, call `interceptablePacket.intercept()` and re-send the object via `session.serverBound(...)`.
+  `ScaffoldModule` is the reference pattern (silent rotation + movement injection); it must stay last
+  in `ModuleManager` because interception stops dispatch to later modules. Its placement strategy is
+  modelled on LiquidBounce (GPLv3, CCBlueX) — algorithms/rules only, no copied code; see the credit
+  in `README.md`.
 - `ModuleValues.kt` — `AutoConfiguration` builds typed settings (`boolValue`, `floatValue`, `intValue`,
   `enumValue`, `listValue`) that double as Kotlin delegates and serialize to JSON. This is how per-module
   options are declared and persisted.
@@ -185,13 +192,41 @@ dark (they sit over the game): `OverlayManager` wraps every overlay's `Content()
 
 **Overlays / click GUI**: `OverlayManager` owns the launcher button, per-module shortcut buttons, and
 the click GUI. The click GUI is skinned by a selectable `GUITheme` (`overlay/GUITheme.kt`: CLASSIC /
-KITSU / GRACE / PROTOHAX). **KITSU, GRACE and PROTOHAX each have their own layout**, all ported from
+KITSU / GRACE / PROTOHAX / DREAM / HACKAI / PIANAIXEL / PIXELSIGHT / LIQUIDPE). **KITSU, GRACE and
+PROTOHAX each have their own layout**, all ported from
 LuminaCN-2.1.0: `overlay/gui/kitsu/` (`kitsugui/*`: 660×500 card, logo + category sidebar, header
 link/close buttons), `overlay/gui/grace/` (`GraceMenuUi`: horizontal animated-gradient rail + 70 dp
 module grid + left-sliding settings panel; layout from Lumina, re-skinned with Elaina's violet
 palette in `GracePalette.kt`), and
 `overlay/gui/protohax/` (`ProtohaxUi`: vertical Material3 rail + expand-in-place module cards). Only
 CLASSIC uses the classic layout (`overlay/gui/classic/OverlayClickGUI.kt`) re-skinned by palette.
+
+The **OpenClickGUI ports** have two shapes:
+
+- `overlay/gui/open/` — Dream, HackAI, Pianaixel, PixelSight run on one parametrised Compose shell,
+  `OpenGuiWindow`, configured by `OpenGuiSpecs` (`OpenGuiSpec.kt`): Dream (sidebar + card list +
+  detail settings pane), HackAI (sidebar + cards + inline settings), Pianaixel (category column +
+  rows + side settings), PixelSight (logo sidebar + cards + side settings + footer). They are
+  re-skinned with Elaina's violet palette and show the "Elaina" brand.
+- `overlay/gui/liquidpe/` — **LiquidPE was fully rewritten in Kotlin** (`LiquidPeRenderer`,
+  `LiquidPeOverlayView`, `LiquidPeModels`, `LiquidPeStore`, `LiquidPeStyle`) from OpenClickGUI's
+  Java renderer. Drawing/hit-testing/panel-drag/animations are preserved; the model uses sealed
+  setting classes and null-safe properties. The unused HUD/binds renderer and the unused grid
+  container were dropped. `LiquidPeGuiWindow` embeds `LiquidPeOverlayView` in an `AndroidView`;
+  `LiquidPeBridge` builds LiquidPE's model from `ModuleManager` and pumps settings both ways
+  (store→Elaina after touch, Elaina→store on draw). Colours are untouched; it uses the project's
+  own `res/font/minecraft.ttf` (the original author's Roboto copy was removed). The search box is
+  typed inline through a transparent Compose field laid over the Canvas box.
+
+All click-GUI windows set `OverlayWindow.immersive = true`, which adds `FLAG_FULLSCREEN` and hides
+the system bars at the view level, so the clock/status bar never shows over a GUI.
+
+A dedicated **界面** page (`router/main/UISettingsPage.kt`, nav item) selects the theme and stores a
+per-theme scale in `overlay/UISettings.kt` (`ui_scale_<THEME>`, 0.8–1.6). Each window reads it when
+created; the Compose themes apply it with `graphicsLayer`, LiquidPE multiplies its reference
+viewport (top-left anchored when the enlarged canvas overflows). Credit in `README.md` /
+`AboutPage`.
+
 `GUITheme.createClickGUI()`
 (`overlay/gui/GuiThemeProvider.kt`) maps theme → window; `OverlayManager.openClickGUI()` builds it lazily
 and `applyTheme()` re-attaches overlays after a change. Palettes live in `game/ClickGuiStyle.kt` +

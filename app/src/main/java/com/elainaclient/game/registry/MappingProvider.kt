@@ -22,14 +22,17 @@ abstract class MappingProvider<T>(val context: Context) {
         }
     }
 
+    /** Highest bundled asset version usable for [protocolVersion], or null if there is none. */
+    fun selectedVersionFor(protocolVersion: Int): Short? =
+        availableVersions.filter { it <= protocolVersion }.maxOrNull()
+
     open fun craftMapping(protocolVersion: Int): T {
-        val available = availableVersions.filter { it <= protocolVersion }
-        if (available.isEmpty()) {
+        val selectedVersion = selectedVersionFor(protocolVersion)
+        if (selectedVersion == null) {
             Log.w("MappingProvider", "No available mapping version <= $protocolVersion in $assetPath")
             error("No available mapping version found for protocol $protocolVersion")
         }
 
-        val selectedVersion = available.max()
         Log.i("MappingProvider", "Selected mapping version $selectedVersion for protocol $protocolVersion")
         return readMapping(selectedVersion)
     }

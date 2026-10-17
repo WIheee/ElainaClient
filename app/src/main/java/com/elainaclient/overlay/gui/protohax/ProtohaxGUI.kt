@@ -39,12 +39,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
 import com.elainaclient.game.ModuleCategory
+import com.elainaclient.overlay.GUITheme
 import com.elainaclient.overlay.OverlayManager
 import com.elainaclient.overlay.OverlayWindow
+import com.elainaclient.overlay.UISettings
 import com.elainaclient.overlay.gui.classic.ConfigurationScreen
 
 /**
@@ -61,6 +65,8 @@ import com.elainaclient.overlay.gui.classic.ConfigurationScreen
  *  - `HomeCategoryUi()`/`ConfigCategoryContent()` → the shared [ConfigurationScreen].
  */
 class ProtohaxGUI : OverlayWindow() {
+
+    override val immersive: Boolean get() = true
 
     private val _layoutParams by lazy {
         super.layoutParams.apply {
@@ -88,6 +94,8 @@ class ProtohaxGUI : OverlayWindow() {
 
     @Composable
     override fun Content() {
+        val context = LocalContext.current
+        val uiScale = remember { UISettings.scale(context, GUITheme.PROTOHAX) }
         val snackbarHostState = remember { SnackbarHostState() }
 
         Column(
@@ -105,6 +113,7 @@ class ProtohaxGUI : OverlayWindow() {
                 modifier = Modifier
                     .padding(vertical = 30.dp, horizontal = 100.dp)
                     .fillMaxSize()
+                    .graphicsLayer(scaleX = uiScale, scaleY = uiScale)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,

@@ -1,6 +1,7 @@
 package com.elainaclient.game.hotbar
 
 import com.elainaclient.game.GameSession
+import org.cloudburstmc.protocol.bedrock.packet.MobEquipmentPacket
 import org.cloudburstmc.protocol.bedrock.packet.PlayerHotbarPacket
 
 /**
@@ -19,7 +20,7 @@ import org.cloudburstmc.protocol.bedrock.packet.PlayerHotbarPacket
  *
  * `WRelaySession.serverBound()`/`clientBound()` bypass the normal interception pipeline entirely,
  * and that pipeline is the ONLY place `PlayerInventory.heldItemSlot` gets updated (it listens for
- * the real client's own traffic). So after sending a `PlayerHotbarPacket` ourselves, the change must
+ * the real client's own traffic). So after sending a `MobEquipmentPacket` ourselves, the change must
  * be predicted locally or `heldItemSlot` silently never moves - leaving `hand`
  * (= `content[heldItemSlot]`) pointing at whichever slot was selected before, and mismatching the
  * `hotbarSlot` in every subsequent placement packet.
@@ -39,13 +40,15 @@ class HeldSlot(private val session: GameSession) {
 
     /** Tells the real server that [slot] is now held, and predicts the change locally. */
     fun switchOnServer(slot: Int) {
-        val packet = PlayerHotbarPacket().apply {
-            selectedHotbarSlot = slot
+        // Client -> server hotbar selection is MobEquipmentPacket; PlayerHotbarPacket is the
+        // server -> client "make this slot selected" message and is not processed as a client
+        // request. This was the reason a switched-slot placement could be silently ignored.
+        val packet = MobEquipmentPacket().apply {
+            runtimeEntityId = session.localPlayer.runtimeEntityId
+            item = session.localPlayer.inventory.content[slot]
+            inventorySlot = slot
+            hotbarSlot = slot
             containerId = 0
-            // Plain property assignment, not PacketFieldUtil.setPacketField("selectHotbarSlot", ...):
-            // Lombok @Data generates setSelectHotbarSlot, so the setter is public in the linked build
-            // (verified against relay/Protocol - see ADR-0001). The reflective form was redundant.
-            isSelectHotbarSlot = true
         }
         session.serverBound(packet)
 

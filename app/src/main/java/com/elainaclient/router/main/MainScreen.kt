@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountCircle
+import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.Dashboard
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Settings
@@ -57,6 +58,7 @@ enum class MainScreenPages(
 ) {
     HomePage(Icons.Rounded.Dashboard, R.string.home, { HomePageContent() }),
     AccountPage(Icons.Rounded.AccountCircle, R.string.account, { AccountPageContent() }),
+    UISettingsPage(Icons.Rounded.Build, R.string.ui_settings, { UISettingsPageContent() }),
     AboutPage(Icons.Rounded.Info, R.string.about, { AboutPageContent() }),
     SettingsPage(Icons.Rounded.Settings, R.string.settings, { SettingsPageContent() })
 }

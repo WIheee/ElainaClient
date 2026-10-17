@@ -8,11 +8,16 @@ import com.elainaclient.game.registry.BlockMappingProvider
 import com.elainaclient.game.registry.ItemMapping
 import com.elainaclient.game.registry.ItemMappingProvider
 import com.elainaclient.game.world.Level
+import com.elainaclient.util.NetLog
 import com.elainaclient.util.setPacketField
 import com.elainaclient.relay.WRelaySession
+import org.cloudburstmc.protocol.bedrock.data.PlayerAuthInputData
 import org.cloudburstmc.protocol.bedrock.data.definitions.ItemDefinition
+import org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventoryTransactionType
 import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket
+import org.cloudburstmc.protocol.bedrock.packet.InventoryTransactionPacket
 import org.cloudburstmc.protocol.bedrock.packet.ItemComponentPacket
+import org.cloudburstmc.protocol.bedrock.packet.PlayerAuthInputPacket
 import org.cloudburstmc.protocol.bedrock.packet.StartGamePacket
 import org.cloudburstmc.protocol.bedrock.packet.TextPacket
 import org.cloudburstmc.protocol.common.SimpleDefinitionRegistry
@@ -74,6 +79,47 @@ class GameSession(val wRelaySession: WRelaySession) : ComposedPacketHandler {
         wRelaySession.serverBound(packet)
     }
 
+    /**
+     * TEMPORARY ([VANILLA] NetLog lines): dumps the exact block-placement packets the real game
+     * client produces, so Scaffold's synthesized transaction can be diffed field-by-field against
+     * what this server actually accepts. Remove once placement is confirmed.
+     */
+    private fun captureVanillaPlacement(packet: BedrockPacket) {
+        runCatching {
+            if (packet is InventoryTransactionPacket &&
+                packet.transactionType == InventoryTransactionType.ITEM_USE
+            ) {
+                val item = packet.itemInHand
+                NetLog.log(
+                    "VANILLA",
+                    "ITEM_USE action=${packet.actionType} trigger=${packet.triggerType} " +
+                        "pos=${packet.blockPosition} face=${packet.blockFace} " +
+                        "slot=${packet.hotbarSlot} hand=${packet.hand} " +
+                        "item=${item.definition.identifier}x${item.count} netId=${item.netId} " +
+                        "player=${packet.playerPosition} click=${packet.clickPosition} " +
+                        "def=${packet.blockDefinition.runtimeId} " +
+                        "pred=${packet.clientInteractPrediction} cooldown=${packet.clientCooldownState} " +
+                        "actions=${packet.actions.size}",
+                )
+            }
+            if (packet is PlayerAuthInputPacket &&
+                packet.inputData.contains(PlayerAuthInputData.PERFORM_ITEM_INTERACTION)
+            ) {
+                val t = packet.itemUseTransaction ?: return@runCatching
+                val item = t.itemInHand
+                NetLog.log(
+                    "VANILLA",
+                    "AUTH_ITEM_USE action=${t.actionType} trigger=${t.triggerType} " +
+                        "pos=${t.blockPosition} face=${t.blockFace} slot=${t.hotbarSlot} " +
+                        "hand=${t.hand} item=${item?.definition?.identifier}x${item?.count} " +
+                        "player=${t.playerPosition} click=${t.clickPosition} " +
+                        "def=${t.blockDefinition?.runtimeId} pred=${t.clientInteractPrediction} " +
+                        "actions=${t.actions.size}",
+                )
+            }
+        }
+    }
+
     // ComposedPacketHandler's default beforeClientBound()/beforeServerBound() both just call
     // this single method, so modules previously had no way to tell which direction a packet
     // was going (e.g. a module rewriting a position needs to touch only outgoing/server-bound
@@ -96,6 +142,8 @@ class GameSession(val wRelaySession: WRelaySession) : ComposedPacketHandler {
     private var earlyPacketDiagCount = 0
 
     private fun handlePacketBound(packet: BedrockPacket, isClientBound: Boolean): Boolean {
+        captureVanillaPlacement(packet)
+
         // TEMPORARY: prints the class name of the first 15 packets seen through this method at
         // all, unconditionally, before anything else can possibly swallow/skip it. If
         // StartGamePacket never shows up here, handlePacketBound either isn't wired up as the
@@ -154,26 +202,48 @@ class GameSession(val wRelaySession: WRelaySession) : ComposedPacketHandler {
                     // the "live" hash-sort path is kept only as a last-resort fallback for when no
                     // bundled asset exists at all for this protocol version.
                     var blockMappingSource = "none"
+                    val livePalette = extractBlockPaletteFromStartGame(packet)
 
-                    try {
-                        blockMapping = blockMappingProvider.craftMapping(protocolVersion)
-                        blockMappingSource = "bundled asset (protocol $protocolVersion)"
-                        Log.i("GameSession", "Loaded block mapping for protocol $protocolVersion")
-                    } catch (e: Exception) {
-                        Log.e("GameSession", "Failed to load bundled block mapping for protocol $protocolVersion, trying the server's own (partial) StartGamePacket palette as a last resort", e)
-                        queueDiagnostic("§c[BlockMappingCheck] bundled asset FAILED: ${e.javaClass.simpleName}: ${e.message}")
-
-                        val livePalette = extractBlockPaletteFromStartGame(packet)
-                        if (livePalette != null) {
-                            try {
-                                blockMapping = BlockMapping.fromPalette(livePalette)
-                                blockMappingSource = "live (${livePalette.size} palette entries, low confidence)"
-                                Log.w("GameSession", "Falling back to a hash-sorted live palette (${livePalette.size} entries) - this is only reliable if blockProperties happened to contain the complete block list")
-                            } catch (e2: Exception) {
-                                Log.e("GameSession", "Live palette fallback also failed", e2)
-                                queueDiagnostic("§c[BlockMappingCheck] live palette fallback ALSO FAILED: ${e2.javaClass.simpleName}: ${e2.message}")
-                            }
+                    // Bundled assets only go up to protocol 800 (the last version shipped in this
+                    // repo). craftMapping() silently picks the newest asset <= the requested
+                    // version, so on a modern server (e.g. protocol 2193 / MC 1.26.50) it loads a
+                    // *stale* palette whose runtime ids no longer line up with the server's - every
+                    // chunk block then decodes as minecraft:unknown, which in turn broke the air
+                    // check, reference-block search and floor scan (Scaffold placed garbage).
+                    //
+                    // The server's own StartGamePacket palette is authoritative for THAT server.
+                    // Use it whenever it is at least as large as the bundled table - a genuinely
+                    // partial custom-block list is smaller, and the bundled table still wins then.
+                    val bundledVersion = blockMappingProvider.selectedVersionFor(protocolVersion)
+                    val bundledMapping = try {
+                        blockMappingProvider.craftMapping(protocolVersion).also {
+                            Log.i("GameSession", "Loaded bundled block mapping (${it.size} entries) for protocol $protocolVersion")
                         }
+                    } catch (e: Exception) {
+                        Log.e("GameSession", "Failed to load bundled block mapping for protocol $protocolVersion", e)
+                        queueDiagnostic("§c[BlockMappingCheck] bundled asset FAILED: ${e.javaClass.simpleName}: ${e.message}")
+                        null
+                    }
+
+                    // A "complete" server palette has thousands of states; a partial custom-block
+                    // list has a handful. >= 500 cleanly separates the two.
+                    val bundledIsExact = bundledVersion != null && bundledVersion.toInt() == protocolVersion
+                    val liveIsComplete = livePalette != null && livePalette.size >= 500
+                    if (livePalette != null && liveIsComplete &&
+                        (bundledMapping == null || !bundledIsExact || livePalette.size > bundledMapping.size)
+                    ) {
+                        try {
+                            blockMapping = BlockMapping.fromPalette(livePalette)
+                            blockMappingSource = "live (${livePalette.size} entries)"
+                            Log.i("GameSession", "Using server block palette: ${livePalette.size} entries (bundled: ${bundledMapping?.size ?: -1}, version: $bundledVersion)")
+                        } catch (e: Exception) {
+                            Log.e("GameSession", "Live palette mapping failed", e)
+                            queueDiagnostic("§c[BlockMappingCheck] live palette failed: ${e.javaClass.simpleName}: ${e.message}")
+                        }
+                    }
+                    if (!isBlockMappingInitialized && bundledMapping != null) {
+                        blockMapping = bundledMapping
+                        blockMappingSource = "bundled (${bundledMapping.size} entries, stale for protocol $protocolVersion)"
                     }
 
                     // Independent of however blockMapping above turned out - itemMapping (used for
@@ -231,6 +301,12 @@ class GameSession(val wRelaySession: WRelaySession) : ComposedPacketHandler {
                         // of view (Log.e alone is invisible without adb/Android Studio).
                         queueDiagnostic("§c[BlockMappingCheck] blockMapping was NEVER initialized - see the FAILED message(s) above")
                     }
+                    NetLog.log(
+                        "MAP",
+                        "block mapping: source=$blockMappingSource protocol=$protocolVersion " +
+                            "livePalette=${livePalette?.size ?: -1} bundled=${bundledMapping?.size ?: -1} " +
+                            "bundledVersion=$bundledVersion initialized=$isBlockMappingInitialized",
+                    )
                 }
             }
 

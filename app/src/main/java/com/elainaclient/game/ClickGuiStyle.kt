@@ -65,6 +65,54 @@ data class ClickGuiStyle(
             headerBackground = Color(0xFF161B20), sidebarBackground = Color(0xFF161B20), buttonBackground = Color(0xFF202A34),
             cornerRadius = 14f
         )
+
+        // OpenClickGUI ports. Only the shell palette is used (the layouts live in overlay/gui/open);
+        // these keep ClickGuiStyle complete for any shared component that reads it.
+        val Dream = ClickGuiStyle(
+            accent = Color(0xFF9D4EDD), accentSecondary = Color(0xFFC77DFF), accentDark = Color(0xFF5A189A),
+            background = Color(0xFF171226), cardBackground = Color(0xFF221B3A), cardBackgroundExpanded = Color(0xFF2B2148),
+            textPrimary = Color(0xFFF0EAFA), textSecondary = Color(0xFFB39DDB), textMuted = Color(0xFF7E6DA3),
+            border = Color(0xFF2E2547), borderActive = Color(0xFF4A3A6E), errorRed = Color(0xFFE5484D),
+            headerBackground = Color(0xFF1B1632), sidebarBackground = Color(0xFF1A1530), buttonBackground = Color(0xFF2B2148),
+            cornerRadius = 22f
+        )
+
+        val HackAi = ClickGuiStyle(
+            accent = Color(0xFFC77DFF), accentSecondary = Color(0xFF9D4EDD), accentDark = Color(0xFF5A189A),
+            background = Color(0xFF171226), cardBackground = Color(0xFF201A35), cardBackgroundExpanded = Color(0xFF2A2148),
+            textPrimary = Color(0xFFF2EEFA), textSecondary = Color(0xFFA99BC8), textMuted = Color(0xFF7C6D9C),
+            border = Color(0xFF2A2140), borderActive = Color(0xFF3A3154), errorRed = Color(0xFFE5484D),
+            headerBackground = Color(0xFF171226), sidebarBackground = Color(0xFF16112B), buttonBackground = Color(0xFF2A2148),
+            cornerRadius = 16f
+        )
+
+        val Pianaixel = ClickGuiStyle(
+            accent = Color(0xFFC77DFF), accentSecondary = Color(0xFF9D4EDD), accentDark = Color(0xFF5A189A),
+            background = Color(0xFF140F22), cardBackground = Color(0xFF261E3D), cardBackgroundExpanded = Color(0xFF3A2C5E),
+            textPrimary = Color(0xFFF4EDFF), textSecondary = Color(0xFFCBBBE6), textMuted = Color(0xFF8B7AAC),
+            border = Color(0xFF4A3A6E), borderActive = Color(0xFF5A4A85), errorRed = Color(0xFFE5484D),
+            headerBackground = Color(0xFF140F22), sidebarBackground = Color(0xFF2E2350), buttonBackground = Color(0xFF3A2C5E),
+            cornerRadius = 26f
+        )
+
+        val PixelSight = ClickGuiStyle(
+            accent = Color(0xFFC77DFF), accentSecondary = Color(0xFF9D4EDD), accentDark = Color(0xFF5A189A),
+            background = Color(0xFF1B1533), cardBackground = Color(0xFF241C40), cardBackgroundExpanded = Color(0xFF2E2450),
+            textPrimary = Color(0xFFFFFFFF), textSecondary = Color(0xFFC5B8E0), textMuted = Color(0xFF807396),
+            border = Color(0xFF332850), borderActive = Color(0xFF4A3A6E), errorRed = Color(0xFFE5484D),
+            headerBackground = Color(0xFF1B1533), sidebarBackground = Color(0xFF161128), buttonBackground = Color(0xFF2E2450),
+            cornerRadius = 28f
+        )
+
+        /** LiquidPE keeps the original LiquidBounce palette (blue accent, near-black panels). */
+        val LiquidPe = ClickGuiStyle(
+            accent = Color(0xFF3C69FC), accentSecondary = Color(0xFF4778F8), accentDark = Color(0xFF12275F),
+            background = Color(0xFF0A0B0E), cardBackground = Color(0xFF101014), cardBackgroundExpanded = Color(0xFF16171D),
+            textPrimary = Color(0xFFFDFDFD), textSecondary = Color(0xFFE1E1E3), textMuted = Color(0xFF88888F),
+            border = Color(0xFF1E1F25), borderActive = Color(0xFF2B2C33), errorRed = Color(0xFFFA3729),
+            headerBackground = Color(0xFF010205), sidebarBackground = Color(0xFF0A0B0E), buttonBackground = Color(0xFF16171D),
+            cornerRadius = 9f
+        )
     }
 }
 

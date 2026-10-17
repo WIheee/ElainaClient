@@ -31,6 +31,7 @@ import com.elainaclient.game.module.misc.SpammerModule
 import com.elainaclient.game.module.misc.ToggleSoundModule
 import com.elainaclient.game.module.misc.WaterMarkModule
 import com.elainaclient.game.module.world.AntiDebuffModule
+import com.elainaclient.game.module.world.ScaffoldModule
 import com.elainaclient.game.module.world.EffectsModule
 import com.elainaclient.game.module.world.ParticlesModule
 import com.elainaclient.game.module.world.TimeShiftModule
@@ -147,6 +148,12 @@ object ModuleManager {
             add(ReplayModule())
             add(PieChartModule())
             add(MinerModule())
+
+            // Must stay last: Scaffold swallows the PlayerAuthInputPacket when it rewrites the
+            // rotation or injects movement, and GameSession stops dispatching a packet as soon as
+            // a module intercepts it. Anything registered after Scaffold would stop seeing auth
+            // input while Scaffold is placing.
+            add(ScaffoldModule())
         }
     }
 

@@ -9,6 +9,7 @@ import org.cloudburstmc.protocol.bedrock.data.inventory.ItemData
 import org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventoryActionData
 import org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventorySource
 import org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventoryTransactionType
+import org.cloudburstmc.protocol.bedrock.data.inventory.transaction.ItemUseTransaction
 import org.cloudburstmc.protocol.bedrock.packet.InventoryTransactionPacket
 
 /**
@@ -273,6 +274,12 @@ internal object PlacementRules {
      * `headPosition` is deliberately left null: the library only serializes it in the `ITEM_RELEASE`
      * branch (`InventoryTransactionSerializer_v291.java:86`, via a `checkNotNull`), so it is never
      * read on the `ITEM_USE` path.
+     *
+     * `triggerType` and `clientInteractPrediction` MUST be set. Both are null by default and
+     * `InventoryTransactionSerializer_v1001.writeItemUse` (still the implementation used by every
+     * newer codec, incl. v2225) calls `.ordinal()` on them - leaving them null throws an NPE while
+     * encoding. The relay catches that per-send and only prints it to stdout, so the placement
+     * packet silently never leaves the device. This was why Scaffold appeared to do nothing.
      */
     internal fun build(
         itemInHand: ItemData,
@@ -285,6 +292,8 @@ internal object PlacementRules {
     ): InventoryTransactionPacket = InventoryTransactionPacket().apply {
         transactionType = InventoryTransactionType.ITEM_USE
         actionType = 0
+        triggerType = ItemUseTransaction.TriggerType.PLAYER_INPUT
+        clientInteractPrediction = ItemUseTransaction.PredictedResult.SUCCESS
         this.blockPosition = blockPosition
         this.blockFace = blockFace
         this.hotbarSlot = hotbarSlot

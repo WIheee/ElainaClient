@@ -24,13 +24,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elainaclient.game.Module
 import com.elainaclient.game.ModuleCategory
+import com.elainaclient.overlay.GUITheme
 import com.elainaclient.overlay.OverlayManager
 import com.elainaclient.overlay.OverlayWindow
+import com.elainaclient.overlay.UISettings
 import com.elainaclient.overlay.gui.classic.ConfigurationScreen
 
 /**
@@ -46,6 +50,8 @@ import com.elainaclient.overlay.gui.classic.ConfigurationScreen
  *  - `ConfigCategoryContent()` → the shared [ConfigurationScreen].
  */
 class GraceGUI : OverlayWindow() {
+
+    override val immersive: Boolean get() = true
 
     private val _layoutParams by lazy {
         super.layoutParams.apply {
@@ -74,6 +80,8 @@ class GraceGUI : OverlayWindow() {
 
     @Composable
     override fun Content() {
+        val context = LocalContext.current
+        val uiScale = remember { UISettings.scale(context, GUITheme.GRACE) }
         val snackbarHostState = remember { SnackbarHostState() }
 
         Box(
@@ -85,7 +93,9 @@ class GraceGUI : OverlayWindow() {
                 ) { OverlayManager.dismissOverlayWindow(this) },
             contentAlignment = Alignment.Center,
         ) {
-            GraceElevatedCard {
+            GraceElevatedCard(
+                Modifier.graphicsLayer(scaleX = uiScale, scaleY = uiScale),
+            ) {
                 Column(
                     Modifier
                         .fillMaxSize()

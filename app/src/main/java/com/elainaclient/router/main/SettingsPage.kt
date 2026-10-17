@@ -378,7 +378,9 @@ fun SettingsPageContent() {
                     tonalElevation = AlertDialogDefaults.TonalElevation
                 ) {
                     Column(
-                        Modifier.padding(24.dp),
+                        Modifier
+                            .padding(24.dp)
+                            .verticalScroll(rememberScrollState()),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {

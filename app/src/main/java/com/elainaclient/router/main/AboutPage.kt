@@ -296,6 +296,27 @@ private fun 致谢Section(context: android.content.Context) {
                     githubUrl = null,
                     context = context
                 )
+
+                ContributorItem(
+                    name = "LiquidBounce / CCBlueX",
+                    description = "Scaffold 模块算法参考（仅算法与逻辑，未复制代码）",
+                    githubUrl = "https://github.com/CCBlueX/LiquidBounce",
+                    context = context
+                )
+
+                ContributorItem(
+                    name = "OpenClickGUI / OpenMoxel",
+                    description = "Dream / HackAI / Pianaixel / PixelSight / LiquidPE 界面参考与重构",
+                    githubUrl = "https://github.com/OpenMoxel/OpenClickGUI",
+                    context = context
+                )
+
+                ContributorItem(
+                    name = "LiquidPE",
+                    description = "特别感谢：保留原版配色与 Minecraft 字体移植（作者 atlasca3@gmail.com）",
+                    githubUrl = null,
+                    context = context
+                )
             }
         }
     }

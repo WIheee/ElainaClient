@@ -55,6 +55,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -64,8 +65,10 @@ import com.elainaclient.R
 import com.elainaclient.game.ClickGuiStyle
 import com.elainaclient.game.LocalClickGuiStyle
 import com.elainaclient.game.ModuleCategory
+import com.elainaclient.overlay.GUITheme
 import com.elainaclient.overlay.OverlayManager
 import com.elainaclient.overlay.OverlayWindow
+import com.elainaclient.overlay.UISettings
 import com.elainaclient.overlay.gui.classic.ConfigurationScreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -79,6 +82,8 @@ import kotlinx.coroutines.launch
  * The Kitsu palette is supplied via [LocalClickGuiStyle] so the module cards pick it up.
  */
 class KitsuGUI : OverlayWindow() {
+
+    override val immersive: Boolean get() = true
 
     private val _layoutParams by lazy {
         super.layoutParams.apply {
@@ -107,6 +112,8 @@ class KitsuGUI : OverlayWindow() {
     @Composable
     override fun Content() {
         val style = ClickGuiStyle.Kitsu
+        val context = LocalContext.current
+        val uiScale = remember { UISettings.scale(context, GUITheme.KITSU) }
         CompositionLocalProvider(LocalClickGuiStyle provides style) {
             val snackbarHostState = remember { SnackbarHostState() }
             var shouldAnimate by remember { mutableStateOf(false) }
@@ -163,6 +170,8 @@ class KitsuGUI : OverlayWindow() {
                         .graphicsLayer {
                             translationY = translateY
                             this.alpha = alpha
+                            scaleX = uiScale
+                            scaleY = uiScale
                         }
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },

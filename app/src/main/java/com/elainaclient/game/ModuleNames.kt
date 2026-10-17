@@ -63,6 +63,7 @@ private val MODULE_NAMES: Map<String, String> = mapOf(
     "zoom" to "缩放",
 
     // World
+    "scaffold" to "自动搭路",
     "FreeCamera" to "自由视角",
     "TimeShift" to "时间调节",
     "WeatherController" to "天气控制",
@@ -341,6 +342,23 @@ private val OPTION_NAMES: Map<String, String> = mapOf(
     "ENABLED" to "启用", "DISABLED" to "禁用",
     "TOP" to "顶部", "BOTTOM" to "底部", "LEFT" to "左侧", "RIGHT" to "右侧",
     "CLIENT" to "客户端", "PLAYER" to "玩家", "ITEM" to "物品", "MOB" to "生物",
+
+    // --- 自动搭路 ---
+    "technique" to "搭路方式",
+    "expand_radius" to "扩展半径",
+    "place_delay" to "放置间隔",
+    "auto_jump" to "自动起跳",
+    "jump_interval" to "起跳间隔",
+    "movement_assist" to "移动辅助",
+    "restore_delay" to "切回延迟",
+    "blacklist" to "方块黑名单",
+    "only_when_moving" to "仅移动时",
+    "Normal" to "普通搭路",
+    "Breezily" to "平视搭路",
+    "GodBridge" to "神桥",
+    "Telly" to "跳跃搭路",
+    "Off" to "关闭",
+    "OneTick" to "单帧伪转向",
 )
 
 fun String.localizedModule(): String = MODULE_NAMES[this] ?: translatedSelf

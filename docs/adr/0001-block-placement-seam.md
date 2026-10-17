@@ -1,8 +1,8 @@
 # Block placement is one seam with face-consistent, randomized clicks
 
-**Status**: accepted — infrastructure retained, but its only callers (SurroundModule /
-PistonCrystalModule) were removed in the crystal-feature purge, so `BlockPlacer` has no production
-caller today. The rules below still describe how it must work whenever it is used again.
+**Status**: accepted — the original callers (SurroundModule / PistonCrystalModule) were removed in
+the crystal-feature purge; `ScaffoldModule` is now the sole production caller. The rules below still
+describe how it must work.
 
 Module code places blocks through a single module (`game/world/BlockPlacer.kt`) instead of building
 `ITEM_USE` transactions itself, and hotbar switching is a separate module (`game/hotbar/HeldSlot.kt`)
@@ -39,11 +39,23 @@ in-game-captured placement packets used.
 _Consequence_: a future edit that reorders the face table, flips a sign, or "corrects" `actionType`
 will fail a test or change placement behaviour on the wire. That is intended.
 
+**4. `triggerType` and `clientInteractPrediction` must be set explicitly.** Both are nullable and
+null by default on `InventoryTransactionPacket`. `InventoryTransactionSerializer_v1001.writeItemUse`
+(which every newer codec, including v2193/v2225, still inherits) calls `.ordinal()` on both while
+encoding, so a packet built without them throws a `NullPointerException` inside the Netty encoder.
+The relay catches send errors per-packet, so the symptom is not a crash: the placement transaction
+simply never reaches the server and Scaffold looks completely dead. Use
+`TriggerType.PLAYER_INPUT` and `PredictedResult.SUCCESS`, matching a real client-initiated click.
+(`hand` defaults to `MAINHAND`; `clientCooldownState` defaults to `0`.)
+
 ## Why hotbar switching is not part of it
 
-A `PlayerHotbarPacket` has two legitimate meanings here, and the code must not collapse them: telling
-the server which slot is held (`HeldSlot.switchOnServer`), and only changing the local display
-(`HeldSlot.switchOnClient`). Sending the server-bound form bypasses the interception pipeline that is the only
-place `heldItemSlot` is updated, so the change must then be predicted locally — an ordering
-invariant that previously lived as a comment in `SurroundModule` and was silently relied on by two
-other modules. It now lives in the module that owns it.
+Sending the server-bound slot change bypasses the interception pipeline that is the only place
+`heldItemSlot` is updated, so the change must then be predicted locally — an ordering invariant that
+previously lived as a comment in `SurroundModule` and was silently relied on by two other modules. It
+now lives in the module that owns it.
+
+The client → server hotbar selection is a `MobEquipmentPacket` (carrying the slot's item);
+`PlayerHotbarPacket` is the server → client "select this slot" message and is not processed as a
+client request. `HeldSlot.switchOnServer` therefore sends `MobEquipmentPacket`, while
+`HeldSlot.switchOnClient` keeps using `PlayerHotbarPacket` for the display-only case.

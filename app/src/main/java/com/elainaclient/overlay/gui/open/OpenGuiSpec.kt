@@ -15,19 +15,21 @@ import com.elainaclient.overlay.gui.open.OpenSettings.Inline
 import com.elainaclient.overlay.gui.open.OpenSettings.Side
 
 /**
- * Skins for the click GUIs ported from OpenMoxel/OpenClickGUI (Dream, HackAI, Pianaixel,
- * PixelSight, LiquidPE).
+ * Skins for the click GUIs ported from OpenMoxel/OpenClickGUI.
  *
- * The five original apps are separate Android projects with their own Canvas drawing code. They
- * are reimplemented here as **one parametrised Compose shell** ([OpenGuiWindow]) plus five style
- * specs, which is what "refactor" means in this port: the layouts below reproduce each project's
- * structure (sidebar vs. top tabs, cards vs. rows vs. floating panels, inline/detail/side
- * settings), while module/settings data comes from Elaina's [com.elainaclient.game.ModuleManager].
+ * The original apps are separate Android projects with their own Canvas drawing code. Pianaixel
+ * and PixelSight are reimplemented here as **one parametrised Compose shell** ([OpenGuiWindow])
+ * plus style specs: the layouts below reproduce each project's structure (sidebar vs. top tabs,
+ * cards vs. rows vs. floating panels, inline/detail/side settings), while module/settings data
+ * comes from Elaina's [com.elainaclient.game.ModuleManager].
  *
- * Palettes:
- *  - Dream / HackAI / Pianaixel / PixelSight are re-skinned with Elaina's violet brand palette and
- *    show the "Elaina" brand name (the originals drew their own text logos / text glyphs).
- *  - LiquidPE keeps its ORIGINAL LiquidBounce-style colours and Minecraft font, per request.
+ * Dream has its own native Canvas port ([com.elainaclient.overlay.gui.dream.DreamGuiWindow]),
+ * HackAI a native View port ([com.elainaclient.overlay.gui.hackai.HackAiGuiWindow]), and LiquidPE
+ * is the direct host of its rewritten Canvas view; their specs below are kept only as layout
+ * references until the remaining Compose themes are retired.
+ *
+ * All ports are re-skinned with Elaina's violet brand palette and show the "Elaina" brand name
+ * (the originals drew their own text logos / text glyphs).
  */
 @Immutable
 data class OpenGuiPalette(

@@ -392,6 +392,7 @@ fun SettingsPageContent() {
                         GUITheme.entries.forEach { guiTheme ->
                             OutlinedCard(
                                 modifier = Modifier.fillMaxWidth(),
+                                enabled = guiTheme.ported,
                                 onClick = {
                                     prefs.edit { putString(GUITheme.PREF_KEY, guiTheme.name) }
                                     OverlayManager.applyTheme()
@@ -403,8 +404,29 @@ fun SettingsPageContent() {
                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    RadioButton(selected = currentGuiTheme == guiTheme, onClick = null)
-                                    Text(guiTheme.displayName, style = MaterialTheme.typography.bodyLarge)
+                                    RadioButton(
+                                        selected = currentGuiTheme == guiTheme,
+                                        onClick = null,
+                                        enabled = guiTheme.ported,
+                                    )
+                                    Column {
+                                        Text(
+                                            guiTheme.displayName,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = if (guiTheme.ported) {
+                                                MaterialTheme.colorScheme.onSurface
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurfaceVariant
+                                            },
+                                        )
+                                        if (!guiTheme.ported) {
+                                            Text(
+                                                "未移植，请等待",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }

@@ -53,8 +53,8 @@ abstract class OverlayWindow {
      */
     @Suppress("DEPRECATION")
     private fun LayoutParams.applyImmersiveCompat() {
-        flags = flags or FLAG_FULLSCREEN
-        layoutInDisplayCutoutMode = LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        flags = flags or LayoutParams.FLAG_FULLSCREEN
+        layoutInDisplayCutoutMode = LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
     }
 
     open val composeView by lazy {

@@ -76,7 +76,7 @@ fun UISettingsPageContent() {
                             Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(10.dp))
-                                .clickable {
+                                .clickable(enabled = theme.ported) {
                                     selectedTheme = theme
                                     prefs.edit { putString(GUITheme.PREF_KEY, theme.name) }
                                     OverlayManager.applyTheme()
@@ -84,12 +84,29 @@ fun UISettingsPageContent() {
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            RadioButton(selected = selectedTheme == theme, onClick = null)
-                            Text(
-                                text = theme.displayName,
-                                modifier = Modifier.weight(1f),
-                                style = MaterialTheme.typography.bodyLarge,
+                            RadioButton(
+                                selected = selectedTheme == theme,
+                                onClick = null,
+                                enabled = theme.ported,
                             )
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    text = theme.displayName,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = if (theme.ported) {
+                                        MaterialTheme.colorScheme.onSurface
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                )
+                                if (!theme.ported) {
+                                    Text(
+                                        text = "未移植，请等待",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
                             Text(
                                 text = "${(UISettings.scale(context, theme) * 100).roundToInt()}%",
                                 style = MaterialTheme.typography.bodyMedium,

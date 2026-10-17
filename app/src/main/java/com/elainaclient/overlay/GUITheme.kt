@@ -9,20 +9,27 @@ import com.elainaclient.game.ClickGuiStyle
  */
 enum class GUITheme(
     val displayName: String,
-    val style: ClickGuiStyle
+    val style: ClickGuiStyle,
+    /**
+     * False while a theme still runs on the shared Compose approximation. Ported themes are listed
+     * first in the pickers; pending ones stay at the end and cannot be selected yet.
+     */
+    val ported: Boolean = true,
 ) {
     CLASSIC("经典", ClickGuiStyle.Classic),
     KITSU("Kitsu", ClickGuiStyle.Kitsu),
     GRACE("Grace", ClickGuiStyle.Grace),
     PROTOHAX("Protohax", ClickGuiStyle.Protohax),
 
-    // Ported from OpenMoxel/OpenClickGUI. The first four are re-skinned with Elaina's palette;
+    // Native Kotlin ports of the OpenClickGUI themes. DREAM/HACKAI are custom rewrites;
     // LIQUIDPE deliberately keeps its original LiquidBounce colours and Minecraft font.
     DREAM("Dream", ClickGuiStyle.Dream),
     HACKAI("HackAI", ClickGuiStyle.HackAi),
-    PIANAIXEL("Pianaixel", ClickGuiStyle.Pianaixel),
-    PIXELSIGHT("PixelSight", ClickGuiStyle.PixelSight),
-    LIQUIDPE("LiquidPE", ClickGuiStyle.LiquidPe);
+    LIQUIDPE("LiquidPE", ClickGuiStyle.LiquidPe),
+
+    // Still on the shared OpenGuiWindow Compose shell; native ports are pending.
+    PIANAIXEL("Pianaixel", ClickGuiStyle.Pianaixel, ported = false),
+    PIXELSIGHT("PixelSight", ClickGuiStyle.PixelSight, ported = false);
 
     companion object {
         const val PREF_KEY = "gui_theme"
